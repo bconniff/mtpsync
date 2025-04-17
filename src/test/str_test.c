@@ -27,7 +27,7 @@ int str_test() {
     assert_join("abcdefghi", str_join(3, "abc", "def", "ghi"));
     assert_join("abcdef", str_join(2, "abc", "def", "ghi"));
 
-    size_t sz = STR_BUF_SIZE * 2;
+    size_t sz = 512;
 
     char* long_str_test1 = malloc((sz+1) * sizeof(char));
     assert(long_str_test1);

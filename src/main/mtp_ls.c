@@ -23,7 +23,7 @@ static MtpStatusCode mtp_ls_callback(Device* dev, void* ls_path) {
     ls_files = device_filter_files(dev, ls_path);
     if (!ls_files) goto done;
 
-    for (size_t i = 0; i < ls_files->size; i++) {
+    for (size_t i = 0; i < list_size(ls_files); i++) {
         DeviceFile* file = list_get(ls_files, i);
         printf("%s%s\n", file->path, file->is_folder ? "/" : "");
     }

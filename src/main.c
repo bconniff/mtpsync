@@ -191,6 +191,7 @@ int main(int argc, char** argv) {
 
     if (result.status == ARG_STATUS_OK) {
         code = mtpsync(result.argc, result.argv, &args);
+        free(result.argv);
     }
 
     switch (code) {

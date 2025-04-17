@@ -23,11 +23,11 @@ static MtpStatusCode mtp_pull_files(Device* dev, List* pull_files_pre, MtpPullPa
     char* to_path = NULL;
     char* to_dir = NULL;
 
-    pull_files = list_new(pull_files_pre->size);
+    pull_files = list_new(list_size(pull_files_pre));
     if (!pull_files) goto done;
 
     size_t from_path_len = strcmp(params->from_path, "/") == 0 ? 0 : strlen(params->from_path);
-    for (size_t i = 0; i < pull_files_pre->size; i++) {
+    for (size_t i = 0; i < list_size(pull_files_pre); i++) {
         DeviceFile* f = list_get(pull_files_pre, i);
 
         to_path = fs_path_join(params->to_path, f->path+from_path_len);
@@ -50,7 +50,7 @@ static MtpStatusCode mtp_pull_files(Device* dev, List* pull_files_pre, MtpPullPa
         to_path = NULL;
     }
 
-    if (!pull_files->size) {
+    if (!list_size(pull_files)) {
         printf("All files already present on the local system.\n");
         code = MTP_STATUS_OK;
         goto done;
@@ -61,7 +61,7 @@ static MtpStatusCode mtp_pull_files(Device* dev, List* pull_files_pre, MtpPullPa
         goto done;
     }
 
-    for (size_t i = 0; i < pull_files->size; i++) {
+    for (size_t i = 0; i < list_size(pull_files); i++) {
         DeviceFile* f = list_get(pull_files, i);
 
         to_path = fs_path_join(params->to_path, f->path+from_path_len);
@@ -126,7 +126,7 @@ static MtpStatusCode mtp_pull_callback(Device* dev, void* data) {
     pull_files_only = list_filter(pull_files, exclude_folders);
     if (!pull_files_only) goto done;
 
-    if (!pull_files_only->size) {
+    if (!list_size(pull_files_only)) {
         fprintf(stderr, "No matching files on device: %s\n", params->from_path);
         goto done;
     }

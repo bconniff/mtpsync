@@ -6,15 +6,23 @@
 #include "list.h"
 #include "hash.h"
 
-static inline void* hash_entry_get_key(void* item) {
-    HashEntry* entry = item;
-    return entry ? entry->key : NULL;
-}
+// Max load factor for the hash before automatically expanding capacity
+#define HASH_LOAD_FACTOR 0.75
 
-static inline void* hash_entry_get_value(void* item) {
-    HashEntry* entry = item;
-    return entry ? entry->value : NULL;
-}
+struct Hash {
+    HashCodeFn hc_fn;   // Function used to determine hash codes for keys
+    HashCmpFn cmp_fn;   // Functoin used to compare keys fore equality
+    HashEntry** items;  // Array of hash buckets
+    size_t capacity;    // Maximum capacity of the hash
+    size_t size;        // Current number of entries in the hash
+};
+
+struct HashEntry {
+    size_t hc;        // Hash code for the item
+    HashEntry* next;  // Next item in the same hash bucket
+    void* key;        // Key for the hash entry
+    void* value;      // Value for the hash entry
+};
 
 Hash* hash_new(size_t capacity, HashCodeFn hc_fn, HashCmpFn cmp_fn) {
     Hash* h = NULL;
@@ -150,6 +158,22 @@ error:
     return NULL;
 }
 
+inline void* hash_entry_key(HashEntry* e) {
+    return e ? e->key : NULL;
+}
+
+inline void* hash_entry_value(HashEntry* e) {
+    return e ? e->value : NULL;
+}
+
+static inline void* hash_entry_get_key(void* item) {
+    return hash_entry_key((HashEntry*)item);
+}
+
+static inline void* hash_entry_get_value(void* item) {
+    return hash_entry_value((HashEntry*)item);
+}
+
 List* hash_keys(Hash* h) {
     List* entries = hash_entries(h);
     if (!entries) return NULL;
@@ -199,8 +223,12 @@ error:
     return HASH_STATUS_ENOMEM;
 }
 
-void hash_entry_free(HashEntry* e) {
-    free(e);
+inline size_t hash_size(Hash* h) {
+    return h->size;
+}
+
+void hash_entry_free(HashEntry* h) {
+    free(h);
 }
 
 void hash_free(Hash* h) {

@@ -13,6 +13,9 @@
 #include "str.h"
 #include "list.h"
 
+#define FS_FILE_BUF_SIZE 128
+#define FS_DIR_BUF_SIZE 32
+
 enum FsPathState {
     FS_PATH_START,
     FS_PATH_NAME,
@@ -69,7 +72,7 @@ static FsStatusCode fs_collect_files_recursive(List* files, char *path) {
     closedir(dir);
     dir = NULL;
 
-    for (size_t i = 0; i < children->size; i++) {
+    for (size_t i = 0; i < list_size(children); i++) {
         char* child_path = list_get(children, i);
         fs_collect_files_recursive(files, child_path);
     }

@@ -31,29 +31,29 @@ int list_test(int sz) {
     list_push(l, "def");
     list_push(l, "ghi");
 
-    assert(l->size == 3);
+    assert(list_size(l) == 3);
     assert(strcmp("abc", list_get(l, 0)) == 0);
     assert(strcmp("def", list_get(l, 1)) == 0);
     assert(strcmp("ghi", list_get(l, 2)) == 0);
 
     assert(strcmp("ghi", list_pop(l)) == 0);
-    assert(l->size == 2);
+    assert(list_size(l) == 2);
 
     list_push(l, "jklm");
 
-    assert(l->size == 3);
+    assert(list_size(l) == 3);
     assert(strcmp("jklm", list_get(l, 2)) == 0);
 
     // TEST FILTERING
     List* filtered = list_filter(l, filter_fn);
-    assert(filtered->size == 2);
+    assert(list_size(filtered) == 2);
     assert(strcmp("abc", list_get(filtered, 0)) == 0);
     assert(strcmp("def", list_get(filtered, 1)) == 0);
     list_free(filtered);
 
     // TEST SORTING
     List* sorted = list_sort(l, cmp_fn);
-    assert(sorted->size == 3);
+    assert(list_size(sorted) == 3);
     assert(strcmp("jklm", list_get(sorted, 0)) == 0);
     assert(strcmp("def", list_get(sorted, 1)) == 0);
     assert(strcmp("abc", list_get(sorted, 2)) == 0);
@@ -61,14 +61,14 @@ int list_test(int sz) {
 
     // TEST MAPPING
     List* mapped = list_map(l, map_fn);
-    assert(mapped->size == 3);
+    assert(list_size(mapped) == 3);
     assert(strcmp("Zabc", list_get(mapped, 0)) == 0);
     assert(strcmp("Zdef", list_get(mapped, 1)) == 0);
     assert(strcmp("Zjklm", list_get(mapped, 2)) == 0);
     list_free_deep(mapped, free);
 
     // TEST ORIGINAL LIST NOT MUTATED
-    assert(l->size == 3);
+    assert(list_size(l) == 3);
     assert(strcmp("abc", list_get(l, 0)) == 0);
     assert(strcmp("def", list_get(l, 1)) == 0);
     assert(strcmp("jklm", list_get(l, 2)) == 0);
@@ -78,7 +78,7 @@ int list_test(int sz) {
     list_unshift(l, "123");
     list_unshift(l, "456");
 
-    assert(l->size == 6);
+    assert(list_size(l) == 6);
     assert(strcmp("456", list_get(l, 0)) == 0);
     assert(strcmp("123", list_get(l, 1)) == 0);
     assert(strcmp("xyz", list_get(l, 2)) == 0);
@@ -86,14 +86,14 @@ int list_test(int sz) {
 
     assert(strcmp("456", list_shift(l)) == 0);
     assert(strcmp("123", list_shift(l)) == 0);
-    assert(l->size == 4);
+    assert(list_size(l) == 4);
 
     assert(strcmp("xyz", list_get(l, 0)) == 0);
 
     assert(strcmp("xyz", list_shift(l)) == 0);
     assert(strcmp("abc", list_shift(l)) == 0);
 
-    assert(l->size == 2);
+    assert(list_size(l) == 2);
     assert(strcmp("def", list_get(l, 0)) == 0);
     assert(strcmp("jklm", list_get(l, 1)) == 0);
 

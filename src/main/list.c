@@ -5,6 +5,13 @@
 
 #include "list.h"
 
+struct List {
+    void** items;     // Items in the list. Do not use this directly.
+    size_t start_idx; // Index of the first item of the list
+    size_t size;      // Total number of items in the list
+    size_t capacity;  // Maximum capacity of the list
+};
+
 static inline void* list_map_fn_without_data(void* item, void* data) {
     ListMapFn fn = (ListMapFn)data;
     return fn(item);
@@ -19,6 +26,7 @@ static inline int list_filter_fn_without_data(void* item, void* data) {
     ListFilterFn fn = (ListFilterFn)data;
     return fn(item);
 }
+
 static inline int list_real_index(List* l, size_t i) {
     return (l->start_idx + i) % l->capacity;
 }
@@ -49,6 +57,10 @@ error:
     free(items);
     errno = ENOMEM;
     return NULL;
+}
+
+inline size_t list_size(List* l) {
+    return l->size;
 }
 
 ListStatusCode list_resize(List* l, size_t capacity) {
@@ -235,7 +247,7 @@ void list_each(List* l, ListEachFn f) {
     return list_each_data(l, list_each_fn_without_data, f);
 }
 
-List* list_sort(List* l, ListCompFn comp) {
+List* list_sort(List* l, ListCmpFn comp) {
     List* result = list_new(l->capacity);
 
     if (!result) goto error;

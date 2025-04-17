@@ -47,13 +47,13 @@ static List* unique_strs(List* strs) {
     List* result = NULL;
     Hash* unique_hash = NULL;
 
-    result = list_new(strs->size);
+    result = list_new(list_size(strs));
     if (!result) goto error;
 
-    unique_hash = hash_new_str(strs->size * 2);
+    unique_hash = hash_new_str(list_size(strs) * 2);
     if (!unique_hash) goto error;
 
-    for (size_t i = 0; i < strs->size; i++) {
+    for (size_t i = 0; i < list_size(strs); i++) {
         char* str = list_get(strs, i);
         HashPutResult r = hash_put(unique_hash, str, str);
         int is_existing = r.old_entry != NULL;
@@ -79,7 +79,7 @@ MtpStatusCode mtp_rm_files(Device* dev, List* rm_files) {
     List* rm_files_unique = NULL;
     List* rm_files_order = NULL;
 
-    if (!rm_files->size) {
+    if (!list_size(rm_files)) {
         printf("No files to delete.\n");
         code = MTP_STATUS_OK;
         goto done;
@@ -93,7 +93,7 @@ MtpStatusCode mtp_rm_files(Device* dev, List* rm_files) {
     rm_files_order = list_sort(rm_files_unique, device_file_sort_deletion);
     if (!rm_files_order) goto done;
 
-    for (size_t i = 0; i < rm_files_order->size; i++) {
+    for (size_t i = 0; i < list_size(rm_files_order); i++) {
         DeviceFile* f = list_get(rm_files_order, i);
         printf("%s: %s%s\n", MTP_RM_MSG, f->path, f->is_folder ? "/" : "");
     }
@@ -103,7 +103,7 @@ MtpStatusCode mtp_rm_files(Device* dev, List* rm_files) {
         goto done;
     }
 
-    for (size_t i = 0; i < rm_files_order->size; i++) {
+    for (size_t i = 0; i < list_size(rm_files_order); i++) {
         DeviceFile* f = list_get(rm_files_order, i);
         printf("%s: %s%s: ", MTP_RM_MSG, f->path, f->is_folder ? "/" : "");
         if (LIBMTP_Delete_Object(dev->device, f->id) != 0) {
@@ -138,7 +138,7 @@ MtpStatusCode mtp_rm_paths(Device* dev, List* rm_paths) {
     rm_files = list_new(MTP_RM_INIT_SIZE);
     if (!rm_files) goto done;
 
-    for (size_t i = 0; i < rm_paths->size; i++) {
+    for (size_t i = 0; i < list_size(rm_paths); i++) {
         char* rm_path = list_get(rm_paths, i);
 
         tmp_files = device_filter_files(dev, rm_path);
@@ -168,10 +168,10 @@ MtpStatusCode mtp_rm(MtpDeviceParams* mtp_params, List* rm_paths) {
     char* rm_path_r = NULL;
     List* rm_paths_r = NULL;
 
-    rm_paths_r = list_new(rm_paths->size);
+    rm_paths_r = list_new(list_size(rm_paths));
     if (!rm_paths_r) goto done;
 
-    for (size_t i = 0; i < rm_paths->size; i++) {
+    for (size_t i = 0; i < list_size(rm_paths); i++) {
         rm_path_r = fs_resolve_cwd("/", list_get(rm_paths, i));
         if (!rm_path_r) goto done;
 

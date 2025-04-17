@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <libmtp.h>
 
+#include "hash.h"
 #include "device.h"
 #include "fs.h"
 #include "str.h"
@@ -27,7 +28,7 @@ static void device_file_free(DeviceFile* f) {
 
 static void device_hash_entry_free(HashEntry* e) {
     if (e) {
-        device_file_free(e->value);
+        device_file_free(hash_entry_value(e));
         hash_entry_free(e);
     }
 }
@@ -153,7 +154,7 @@ DeviceStatusCode device_load(Device* d) {
         printf("\33[2K\rFailed!\n");
         goto error;
     }
-    printf("\33[2K\rDone, received %zu files.\n", new_files->size);
+    printf("\33[2K\rDone, received %zu files.\n", hash_size(new_files));
 
     return DEVICE_STATUS_OK;
 
@@ -187,7 +188,7 @@ static int is_within_path(void* item, void* data) {
     return file_path[i] == '/' || !file_path[i];
 }
 
-List* device_filter_files_sorted(Device* dev, char* path, ListCompFn fn) {
+List* device_filter_files_sorted(Device* dev, char* path, ListCmpFn fn) {
     List* files = NULL;
     List* filtered = NULL;
     List* sorted = NULL;

@@ -48,7 +48,7 @@ int fs_test(int sz) {
 
     int found = 0;
 
-    for (size_t i = 0; i < files->size; i++) {
+    for (size_t i = 0; i < list_size(files); i++) {
         if (strcmp("src/test/fs_test.c", list_get(files, i)) == 0) {
             found = 1;
             break;
@@ -62,7 +62,7 @@ int fs_test(int sz) {
     // TEST COLLECT A SINGLE FILE
     files = fs_collect_files("./src/test/fs_test.c");
     assert(files);
-    assert(files->size == 1);
+    assert(list_size(files) == 1);
     assert(strcmp((char*)list_get(files, 0), "str/test/fs_test.c"));
     list_free_deep(files, free);
 

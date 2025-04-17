@@ -4,33 +4,83 @@
 /**
  * List structure. Use list_new to create one.
  */
-typedef struct {
-    void** items;
-    size_t start_idx;
-    size_t size;
-    size_t capacity;
-} List;
+typedef struct List List;
 
 /**
  * Status codes for various list operations
  */
 typedef enum {
-    LIST_STATUS_OK,
-    LIST_STATUS_ENOMEM,
+    LIST_STATUS_OK,      ///< Operation succeeded
+    LIST_STATUS_ENOMEM,  ///< Failed due to allocation error
 } ListStatusCode;
 
-// callback functions for map/filter/each/sort/free operations
-typedef int (*ListFilterFn)(void*);
-typedef void* (*ListMapFn)(void*);
-typedef void (*ListEachFn)(void*);
-typedef int (*ListCompFn)(const void*, const void*);
-typedef void (*ListItemFreeFn)();
+/**
+ * Callback function for the list_filter operation. This callback is executed
+ * once for each item in the list and is expected to return truthy if the
+ * item should be added to the newly created list, or zero if not.
+ * @param item  each item of the list
+ * @return      truthy if the item should be added to the new list
+ */
+typedef int (*ListFilterFn)(void* item);
 
-// equivalent callbacks that accept an additional data param
-typedef int (*ListFilterDataFn)(void*, void*);
-typedef void* (*ListMapDataFn)(void*, void*);
-typedef void (*ListEachDataFn)(void*, void*);
-typedef void (*ListItemFreeDataFn)(void*);
+/**
+ * Callback function for the list_map operation. This callback is executed
+ * once for each item in the list and is expected to return a value to be
+ * added into the newly created list.
+ * @param item  each item of the list
+ * @return      the new list item
+ */
+typedef void* (*ListMapFn)(void* item);
+
+/**
+ * Callback function for the list_each operation. This callback is executed
+ * once for each item in the list and is not expected to produce a result.
+ * @param item  each item of the list
+ */
+typedef void (*ListEachFn)(void* item);
+
+/**
+ * Callback function for the list_sort operation. Compares two items in the
+ * list to determine what order they should be sorted in.
+ * @param a  first item to compare
+ * @param b  second item to compare
+ * @return   negative if a should be sorted before b, zero if a should be
+ *           sorted equal to b, and postiive if a should be sorted after b
+ */
+typedef int (*ListCmpFn)(const void* a, const void* b);
+
+/**
+ * Callback function to free an item of the list. Used by the list_free_deep
+ * operation which frees the list itself and all items within the list.
+ * @param item  to be freed
+ */
+typedef void (*ListItemFreeFn)(void* item);
+
+/**
+ * Used with the list_filter_data operation. Same as ListFilterFn, but accepts
+ * an additional data parameter for data to be passed into the callback.
+ * @param item  each item of the list
+ * @param data  opaque context data passed into each callback
+ * @return      truthy if the item should be added to the new list
+ */
+typedef int (*ListFilterDataFn)(void* item, void* data);
+
+/**
+ * Used with the list_map_data operation. Same as ListMapFn, but accepts
+ * an additional data parameter for data to be passed into the callback.
+ * @param item  each item of the list
+ * @param data  opaque context data passed into each callback
+ * @return      the new list item
+ */
+typedef void* (*ListMapDataFn)(void* item, void* data);
+
+/**
+ * Used with the list_each_data operation. Same as ListEachFn, but accepts
+ * an additional data parameter for data to be passed into the callback.
+ * @param item  each item of the list
+ * @param data  opaque context data passed into each callback
+ */
+typedef void (*ListEachDataFn)(void* item, void* data);
 
 /**
  * Resize the internal capacity of the list.
@@ -44,12 +94,19 @@ ListStatusCode list_resize(List* l, size_t capacity);
 
 /**
  * Allocate a new list.
- * Implements a ring buffer array for efficient push/pop operations
- * with amortized time expansion.
+ * Implements a ring buffer array for efficient push/pop operations with
+ * amortized expansion. Free it with list_free when you're done.
  * @param capacity  initial list capacity
- * @return          pointer to the new List
+ * @return          pointer to the new List, or NULL in case of failure
  */
 List* list_new(size_t capacity);
+
+/**
+ * Retrieve the number of items in the list.
+ * @param l  to check the size of
+ * @return   current size of the list
+ */
+size_t list_size(List* l);
 
 /**
  * Prepend an item to the beginning of the list.
@@ -168,7 +225,7 @@ List* list_map(List* l, ListMapFn);
  * @param f  transformer function
  * @         transformed copy of the list
  */
-List* list_sort(List* l, ListCompFn);
+List* list_sort(List* l, ListCmpFn);
 
 /**
  * Iterate the list and run a callback function for each item.

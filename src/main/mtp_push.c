@@ -329,13 +329,13 @@ static MtpStatusCode mtp_cleanup_files(Device* dev, MtpSyncSpec* sync_spec, List
     files_after = device_filter_files(dev, sync_spec->to_path);
     if (!files_after) goto done;
 
-    files_stray = list_new(files_after->size);
+    files_stray = list_new(list_size(files_after));
     if (!files_after) goto done;
 
-    target_hash = hash_new_str(push_specs->size * 2);
+    target_hash = hash_new_str(list_size(push_specs) * 2);
     if (!target_hash) goto done;
 
-    for (size_t i = 0; i < push_specs->size; i++) {
+    for (size_t i = 0; i < list_size(push_specs); i++) {
         MtpPushSpec* spec = list_get(push_specs, i);
 
         target = strdup(spec->target);
@@ -344,10 +344,8 @@ static MtpStatusCode mtp_cleanup_files(Device* dev, MtpSyncSpec* sync_spec, List
         do {
             HashPutResult r = hash_put(target_hash, target, spec);
             int is_existing = r.old_entry != NULL;
-            if (r.old_entry) {
-                free(r.old_entry->key);
-                hash_entry_free(r.old_entry);
-            }
+            free(hash_entry_key(r.old_entry));
+            hash_entry_free(r.old_entry);
             if (r.status != HASH_STATUS_OK) goto done;
 
             if (is_existing) break;
@@ -359,7 +357,7 @@ static MtpStatusCode mtp_cleanup_files(Device* dev, MtpSyncSpec* sync_spec, List
         target = NULL;
     }
 
-    for (size_t i = 0; i < files_after->size; i++) {
+    for (size_t i = 0; i < list_size(files_after); i++) {
         DeviceFile* f = list_get(files_after, i);
         if (!hash_get(target_hash, f->path)) {
             if (list_push(files_stray, f) != LIST_STATUS_OK) goto done;
@@ -393,10 +391,10 @@ static MtpStatusCode mtp_push_callback(Device* dev, void* data) {
     MtpSyncSpec* sync_spec = (MtpSyncSpec*)data;
     List* push_specs_pre = sync_spec->push_specs;
 
-    push_specs = list_new(push_specs_pre->size);
+    push_specs = list_new(list_size(push_specs_pre));
     if (!push_specs) goto done;
 
-    for (size_t i = 0; i < push_specs_pre->size; i++) {
+    for (size_t i = 0; i < list_size(push_specs_pre); i++) {
         MtpPushSpec* push_spec = list_get(push_specs_pre, i);
         DeviceFile* f = hash_get(file_hash, push_spec->target);
         if (f) {
@@ -407,13 +405,13 @@ static MtpStatusCode mtp_push_callback(Device* dev, void* data) {
         }
     }
 
-    if (push_specs->size) {
+    if (list_size(push_specs)) {
         if (!io_confirm("Proceed [y/n]? ")) {
             code = MTP_STATUS_EREJECT;
             goto done;
         }
 
-        for (size_t i = 0; i < push_specs->size; i++) {
+        for (size_t i = 0; i < list_size(push_specs); i++) {
             MtpPushSpec* push_spec = list_get(push_specs, i);
             MtpPushResult dir_result = mtp_ensure_dir(dev, push_spec);
             if (dir_result.status != MTP_STATUS_OK) goto done;
@@ -460,7 +458,7 @@ MtpStatusCode mtp_push(MtpDeviceParams* mtp_params, char* from_path, char* to_pa
     files = fs_collect_files(from_path_r);
     if (!files) goto done;
 
-    if (!files->size) {
+    if (!list_size(files)) {
         printf("No files in local path: %s\n", from_path_r);
         goto done;
     }
@@ -469,7 +467,7 @@ MtpStatusCode mtp_push(MtpDeviceParams* mtp_params, char* from_path, char* to_pa
     if (!files_sorted) goto done;
 
     size_t from_path_len = strlen(from_path_r);
-    for (size_t i = 0; i < files_sorted->size; i++) {
+    for (size_t i = 0; i < list_size(files_sorted); i++) {
         char* target = NULL;
         MtpPushSpec* push_spec = NULL;
 

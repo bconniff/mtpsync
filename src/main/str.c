@@ -6,6 +6,8 @@
 
 #include "str.h"
 
+#define STR_BUF_SIZE 128
+
 char* str_join(size_t argc, ...) {
     char* result = NULL;
 
