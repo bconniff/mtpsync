@@ -9,7 +9,7 @@ First, make sure you have `libmtp` installed.
 
 Build `mtpsync` with make:
 
-```sh
+```shell
 make
 ```
 
@@ -21,7 +21,7 @@ There are a variety of sub-commands available.
 
 First, use `mtpsync devices` to see your available devices.
 
-```sh
+```shell
 mtpsync devices
 ```
 
@@ -38,7 +38,7 @@ Device: Venu 2S
 
 Now, use the `ls`, `pull`, `push` and `rm` commands to interact with your devices:
 
-```
+```shell
 # list files on all attached devices, by default
 mtpsync ls /
 
