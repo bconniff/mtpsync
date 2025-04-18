@@ -1,3 +1,8 @@
+/**
+ * @file hash.h
+ * Hash table data structure.
+ */
+
 #ifndef _HASH_H_
 #define _HASH_H_
 
@@ -58,7 +63,7 @@ typedef struct Hash Hash;
 /**
  * Callback function to free an item of the list. Used by the list_free_deep
  * operation which frees the list itself and all items within the list.
- * @param item  to be freed
+ * @param entry  to be freed
  */
 typedef void (*HashEntryFreeFn)(HashEntry* entry);
 

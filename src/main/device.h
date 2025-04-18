@@ -1,3 +1,8 @@
+/**
+ * @file device.h
+ * Wrapper to encapsulate a specific MTP device and storage volume.
+ */
+
 #ifndef _DEVICE_H_
 #define _DEVICE_H_
 
@@ -66,9 +71,9 @@ List* device_filter_files(Device* d, char* path);
  * that this does not actually transfer any data to the attached MTP device,
  * and is only use to cache the new file in the files hash. Clients should
  * handle MTP operations on their own.
- * @param d     device to add the file to
- * @param path  path to search for files in
- * @return      list of all matching file, or NULL in case of failure
+ * @param d  device to add the file to
+ * @param f  path to search for files in
+ * @return   list of all matching file, or NULL in case of failure
  */
 DeviceStatusCode device_add_file(Device* d, DeviceFile* f);
 

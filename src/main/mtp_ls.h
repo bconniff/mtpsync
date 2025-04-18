@@ -1,3 +1,7 @@
+/**
+ * @file mtp_ls.h
+ * Implements the "ls" sub-command.
+ */
 #ifndef _MTP_LS_H_
 #define _MTP_LS_H_
 

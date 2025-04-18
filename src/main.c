@@ -180,14 +180,14 @@ int main(int argc, char** argv) {
     MtpStatusCode code = MTP_STATUS_EFAIL;
     MtpArgs args = {0};
 
-    ArgDefinition defs[] = {
+    ArgDefinition defv[] = {
         { .arg_long = "cleanup", .arg_short = 'x', .arg_fn = cleanup_arg },
         { .arg_long = "device", .arg_short = 'd', .arg_fn = device_arg },
         { .arg_long = "storage", .arg_short = 's', .arg_fn = storage_arg },
     };
 
-    size_t def_count = sizeof(defs)/sizeof(ArgDefinition);
-    ArgParseResult result = arg_parse(argc, argv, defs, def_count, &args);
+    size_t defc = sizeof(defv)/sizeof(ArgDefinition);
+    ArgParseResult result = arg_parse(argc, argv, defc, defv, &args);
 
     if (result.status == ARG_STATUS_OK) {
         code = mtpsync(result.argc, result.argv, &args);

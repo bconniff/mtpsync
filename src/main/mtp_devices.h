@@ -1,3 +1,8 @@
+/**
+ * @file mtp_devices.h
+ * Implements the "devices" sub-command.
+ */
+
 #ifndef _MTP_DEVICES_H_
 #define _MTP_DEVICES_H_
 

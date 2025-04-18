@@ -5,7 +5,7 @@
 
 #include "args.h"
 
-ArgParseResult arg_parse(int argc, char** argv, ArgDefinition defs[], size_t def_count, void* data) {
+ArgParseResult arg_parse(int argc, char** argv, size_t defc, ArgDefinition defv[], void* data) {
     ArgParseResult result = {
         .status = ARG_STATUS_ESYNTAX,
         .argc = 0,
@@ -32,8 +32,8 @@ ArgParseResult arg_parse(int argc, char** argv, ArgDefinition defs[], size_t def
                 break;
             }
 
-            for (size_t j = 0; j < def_count; j++) {
-                ArgDefinition a = defs[j];
+            for (size_t j = 0; j < defc; j++) {
+                ArgDefinition a = defv[j];
                 if (strcmp(a.arg_long, arg+2) == 0) {
                     if (a.arg_fn(argc, argv, &i, data) != ARG_STATUS_OK) goto error;
                     goto next;
@@ -46,8 +46,8 @@ ArgParseResult arg_parse(int argc, char** argv, ArgDefinition defs[], size_t def
         // short option
         if (strncmp("-", arg, 1) == 0) {
             if (strlen(arg) == 2) {
-                for (size_t j = 0; j < def_count; j++) {
-                    ArgDefinition a = defs[j];
+                for (size_t j = 0; j < defc; j++) {
+                    ArgDefinition a = defv[j];
                     if (a.arg_short == arg[1]) {
                         if (a.arg_fn(argc, argv, &i, data) != ARG_STATUS_OK) goto error;
                         goto next;

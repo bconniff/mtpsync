@@ -1,3 +1,8 @@
+/**
+ * @file fs.h
+ * Reusable functions for working with the local filesystem.
+ */
+
 #ifndef _FS_H_
 #define _FS_H_
 

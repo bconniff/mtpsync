@@ -1,3 +1,8 @@
+/**
+ * @file mtp_push.h
+ * Implements the "push" sub-command.
+ */
+
 #ifndef _MTP_PUSH_H_
 #define _MTP_PUSH_H_
 
@@ -9,6 +14,6 @@
  * @param cleanup    if truthy, delete stray files from the to_path
  * @return           status code of the operation
  */
-MtpStatusCode mtp_push(MtpDeviceParams* mtp_params, char* from_path, char* to_path, int cleanup);
+MtpStatusCode mtp_push(MtpDeviceParams* params, char* from_path, char* to_path, int cleanup);
 
 #endif

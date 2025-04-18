@@ -1,6 +1,7 @@
 CC = gcc
 CFLAGS = -Wall -g
 
+COMMON_HEADERS = $(wildcard src/main/*.h)
 COMMON_SOURCES = $(wildcard src/main/*.c)
 MAIN_SOURCES = $(COMMON_SOURCES) src/main.c
 TEST_SOURCES = $(COMMON_SOURCES) $(wildcard src/test/*.c) src/test.c
@@ -14,7 +15,7 @@ TEST = ./bin/mtptest
 
 all: $(MAIN) docs
 
-docs:
+docs: $(COMMON_HEADERS) $(COMMON_HEADERS) Doxyfile
 	doxygen Doxyfile
 
 test: $(TEST)

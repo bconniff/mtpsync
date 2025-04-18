@@ -1,3 +1,8 @@
+/**
+ * @file mtp_pull.h
+ * Implements the "pull" sub-command.
+ */
+
 #ifndef _MTP_PULL_H_
 #define _MTP_PULL_H_
 
@@ -8,6 +13,6 @@
  * @param to_path    local path to retrieve files into
  * @return           status code of the operation
  */
-MtpStatusCode mtp_pull(MtpDeviceParams* mtp_params, char* from_path, char* to_path);
+MtpStatusCode mtp_pull(MtpDeviceParams* params, char* from_path, char* to_path);
 
 #endif

@@ -1,3 +1,8 @@
+/**
+ * @file str.h
+ * Reusable functions for working with strings.
+ */
+
 #ifndef _STR_H_
 #define _STR_H_
 
@@ -29,19 +34,17 @@ char* str_join(size_t argc, ...);
 /**
  * Converts a string to lowercase. Does not mutate the original string.
  * Allocates the result on the heap, free it when done.
- * @param argc  number of arguments to join
- * @param ...   strings to be joined
- * @return      joined result, or NULL if an error occurred
+ * @param str  to convert to lowercase
+ * @return     joined result, or NULL if an error occurred
  */
-char* str_lower(char*);
+char* str_lower(char* str);
 
 /**
- * Converts a string to lowercase. Does not mutate the original string.
+ * Converts a string to uppercase. Does not mutate the original string.
  * Allocates the result on the heap, free it when done.
- * @param argc  number of arguments to join
- * @param ...   strings to be joined
- * @return      joined result, or NULL if an error occurred
+ * @param str  to convert to uppercase
+ * @return     joined result, or NULL if an error occurred
  */
-char* str_upper(char*);
+char* str_upper(char* str);
 
 #endif

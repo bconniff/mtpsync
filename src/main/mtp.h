@@ -1,14 +1,19 @@
+/**
+ * @file mtp.h
+ * Common functions for interacting with the MTP protocol.
+ */
+
 #ifndef _MTP_H_
 #define _MTP_H_
 
 #include "device.h"
 #include "color.h"
 
-#define MTP_SKIP_MSG   C_BOLD C_YELLOW "SKIP" C_RESET
-#define MTP_PULL_MSG   C_BOLD C_CYAN "PULL" C_RESET
-#define MTP_PUSH_MSG   C_BOLD C_GREEN "PUSH" C_RESET
-#define MTP_RM_MSG     C_BOLD C_RED "RM" C_RESET
-#define MTP_MKDIR_MSG  C_BOLD C_BLUE "MKDIR" C_RESET
+#define MTP_SKIP_MSG   C_BOLD C_YELLOW "SKIP" C_RESET ///< skipped message
+#define MTP_PULL_MSG   C_BOLD C_CYAN "PULL" C_RESET   ///< pull file message
+#define MTP_PUSH_MSG   C_BOLD C_GREEN "PUSH" C_RESET  ///< push file message
+#define MTP_RM_MSG     C_BOLD C_RED "RM" C_RESET      ///< remove file message
+#define MTP_MKDIR_MSG  C_BOLD C_BLUE "MKDIR" C_RESET  ///< mkdir message
 
 /**
  * Status codes for various MTP operations.

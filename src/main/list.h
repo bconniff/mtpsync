@@ -1,3 +1,8 @@
+/**
+ * @file list.h
+ * List data structure using an array-based ring buffer.
+ */
+
 #ifndef _LIST_H_
 #define _LIST_H_
 
@@ -192,7 +197,7 @@ void list_free(List* l);
  * @param l  list to free
  * @param f  function to use to free each item
  */
-void list_free_deep(List* l, ListItemFreeFn);
+void list_free_deep(List* l, ListItemFreeFn f);
 
 /**
  * Create a copy of the list retaining only items that satisfy the
@@ -203,7 +208,7 @@ void list_free_deep(List* l, ListItemFreeFn);
  * @param f  predicate function
  * @         filtered copy of the list
  */
-List* list_filter(List* l, ListFilterFn);
+List* list_filter(List* l, ListFilterFn f);
 
 /**
  * Create a copy of the list by transforming each item.
@@ -214,7 +219,7 @@ List* list_filter(List* l, ListFilterFn);
  * @param f  transformer function
  * @         transformed copy of the list
  */
-List* list_map(List* l, ListMapFn);
+List* list_map(List* l, ListMapFn f);
 
 /**
  * Create a sorted copy of the list based on the provided sort function.
@@ -225,7 +230,7 @@ List* list_map(List* l, ListMapFn);
  * @param f  transformer function
  * @         transformed copy of the list
  */
-List* list_sort(List* l, ListCmpFn);
+List* list_sort(List* l, ListCmpFn f);
 
 /**
  * Iterate the list and run a callback function for each item.
@@ -234,7 +239,7 @@ List* list_sort(List* l, ListCmpFn);
  * @param f  transformer function
  * @         transformed copy of the list
  */
-void list_each(List* l, ListEachFn);
+void list_each(List* l, ListEachFn f);
 
 /**
  * Create a copy of the list retaining only items that satisfy the
@@ -246,7 +251,7 @@ void list_each(List* l, ListEachFn);
  * @param data  context data to pass into the predicate
  * @            filtered copy of the list
  */
-List* list_filter_data(List* l, ListFilterDataFn, void* data);
+List* list_filter_data(List* l, ListFilterDataFn f, void* data);
 
 /**
  * Create a copy of the list by transforming each item.
@@ -258,7 +263,7 @@ List* list_filter_data(List* l, ListFilterDataFn, void* data);
  * @param data  context data to pass into the transformer
  * @            transformed copy of the list
  */
-List* list_map_data(List* l, ListMapDataFn, void* data);
+List* list_map_data(List* l, ListMapDataFn f, void* data);
 
 /**
  * Iterate the list and run a callback function for each item.
@@ -268,6 +273,6 @@ List* list_map_data(List* l, ListMapDataFn, void* data);
  * @param data  context data to pass into the transformer
  * @            transformed copy of the list
  */
-void list_each_data(List* l, ListEachDataFn, void* data);
+void list_each_data(List* l, ListEachDataFn f, void* data);
 
 #endif
