@@ -8,13 +8,14 @@ TEST_SOURCES = $(COMMON_SOURCES) $(wildcard src/test/*.c) src/test.c
 MAIN_OBJECTS = $(MAIN_SOURCES:.c=.o)
 TEST_OBJECTS = $(TEST_SOURCES:.c=.o)
 
-ALL_CLEAN = $(MAIN) $(TEST) $(MAIN_OBJECTS) $(TEST_OBJECTS)
-
 LIBS = -lmtp
 MAIN = ./bin/mtpsync
 TEST = ./bin/mtptest
 
-all: $(MAIN)
+all: $(MAIN) docs
+
+docs:
+	doxygen Doxyfile
 
 test: $(TEST)
 	valgrind --leak-check=yes $(TEST)
@@ -32,3 +33,4 @@ $(TEST): $(TEST_OBJECTS)
 
 clean:
 	rm -f $(MAIN) $(TEST) $(MAIN_OBJECTS) $(TEST_OBJECTS) vgcore.* core.*
+	rm -rf ./docs/
