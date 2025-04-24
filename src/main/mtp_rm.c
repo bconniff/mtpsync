@@ -43,37 +43,6 @@ static inline int device_file_sort_deletion(const void* a, const void* b) {
     return cmp;
 }
 
-static List* unique_strs(List* strs) {
-    List* result = NULL;
-    Hash* unique_hash = NULL;
-
-    result = list_new(list_size(strs));
-    if (!result) goto error;
-
-    unique_hash = hash_new_str(list_size(strs) * 2);
-    if (!unique_hash) goto error;
-
-    for (size_t i = 0; i < list_size(strs); i++) {
-        char* str = list_get(strs, i);
-        HashPutResult r = hash_put(unique_hash, str, str);
-        int is_existing = r.old_entry != NULL;
-        hash_entry_free(r.old_entry);
-        if (r.status != HASH_STATUS_OK) goto error;
-
-        if (is_existing) continue;
-
-        if (list_push(result, str) != LIST_STATUS_OK) goto error;
-    }
-
-    free(unique_hash);
-    return result;
-
-error:
-    list_free(result);
-    hash_free(unique_hash);
-    return NULL;
-}
-
 MtpStatusCode mtp_rm_files(Device* dev, List* rm_files) {
     MtpStatusCode code = MTP_STATUS_EFAIL;
     List* rm_files_unique = NULL;
@@ -85,7 +54,7 @@ MtpStatusCode mtp_rm_files(Device* dev, List* rm_files) {
         goto done;
     }
 
-    rm_files_unique = unique_strs(rm_files);
+    rm_files_unique = hash_unique_strs(rm_files);
     if (!rm_files_unique) goto done;
 
     printf("Deleting files:\n");

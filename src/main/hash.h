@@ -215,4 +215,22 @@ void hash_entry_free(HashEntry* h);
  */
 void hash_free_deep(Hash* h, HashEntryFreeFn free_fn);
 
+/**
+ * Create a list of unique items using a hash. Order is stable.
+ * Free the result when done.
+ * @param items   to find unique values of
+ * @param hc_fn   hash code function to use for uniqueness
+ * @param cmp_fn  comparison function to use for hash collissions
+ * @return        a list of unique values, or NULL in case of an error
+ */
+List* hash_unique(List* items, HashCodeFn hc_fn, HashCmpFn cmp_fn);
+
+/**
+ * Create a list of all unique strings, using a hash to detect uniqueness.
+ * Order is stable. Free the result when done.
+ * @param items  to find unique values of
+ * @return       a list of unique strings, or NULL in case of an error
+ */
+List* hash_unique_strs(List* items);
+
 #endif

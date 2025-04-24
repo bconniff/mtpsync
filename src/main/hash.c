@@ -260,10 +260,45 @@ size_t hash_code_str(void* val) {
     return hc;
 }
 
-int hash_cmp_str(void* a, void* b) {
+inline int hash_cmp_str(void* a, void* b) {
     return strcmp(a, b);
 }
 
-Hash* hash_new_str(size_t capacity) {
+inline Hash* hash_new_str(size_t capacity) {
     return hash_new(capacity, hash_code_str, hash_cmp_str);
+}
+
+List* hash_unique(List* items, HashCodeFn hc_fn, HashCmpFn cmp_fn) {
+    List* result = NULL;
+    Hash* unique_hash = NULL;
+
+    result = list_new(list_size(items));
+    if (!result) goto error;
+
+    unique_hash = hash_new(list_size(items) * 2, hc_fn, cmp_fn);
+    if (!unique_hash) goto error;
+
+    for (size_t i = 0; i < list_size(items); i++) {
+        char* str = list_get(items, i);
+        HashPutResult r = hash_put(unique_hash, str, str);
+        int is_existing = r.old_entry != NULL;
+        hash_entry_free(r.old_entry);
+        if (r.status != HASH_STATUS_OK) goto error;
+
+        if (is_existing) continue;
+
+        if (list_push(result, str) != LIST_STATUS_OK) goto error;
+    }
+
+    hash_free(unique_hash);
+    return result;
+
+error:
+    list_free(result);
+    hash_free(unique_hash);
+    return NULL;
+}
+
+inline List* hash_unique_strs(List* items) {
+    return hash_unique(items, hash_code_str, hash_cmp_str);
 }
