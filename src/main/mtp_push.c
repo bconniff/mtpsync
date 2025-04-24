@@ -330,7 +330,7 @@ static MtpStatusCode mtp_cleanup_files(Device* dev, MtpSyncSpec* sync_spec, List
     if (!files_after) goto done;
 
     files_stray = list_new(list_size(files_after));
-    if (!files_after) goto done;
+    if (!files_stray) goto done;
 
     target_hash = hash_new_str(list_size(push_specs) * 2);
     if (!target_hash) goto done;

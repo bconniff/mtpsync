@@ -202,8 +202,8 @@ List* device_filter_files_sorted(Device* dev, char* path, ListCmpFn fn) {
     sorted = list_sort(filtered, fn);
 
 done:
-    free(files);
-    free(filtered);
+    list_free(files);
+    list_free(filtered);
     return sorted;
 }
 
