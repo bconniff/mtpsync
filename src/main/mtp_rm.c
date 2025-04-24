@@ -13,16 +13,6 @@
 
 #define MTP_RM_INIT_SIZE 512
 
-static inline size_t count_char(char* str, char ch) {
-    size_t count = 0;
-    while (*str) {
-        if (*str++ == ch) {
-            count++;
-        }
-    }
-    return count;
-}
-
 static inline int device_file_sort_deletion(const void* a, const void* b) {
     const DeviceFile* aa = *(const DeviceFile**)a;
     const DeviceFile* bb = *(const DeviceFile**)b;
@@ -31,7 +21,7 @@ static inline int device_file_sort_deletion(const void* a, const void* b) {
 
     // first, if both folders, sort longest path first
     if (aa->is_folder && bb->is_folder) {
-        if (!cmp) cmp = count_char(bb->path, '/') - count_char(aa->path, '/');
+        if (!cmp) cmp = str_count_char(bb->path, '/') - str_count_char(aa->path, '/');
     }
 
     // next, sort folders after files

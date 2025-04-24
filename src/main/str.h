@@ -47,4 +47,12 @@ char* str_lower(char* str);
  */
 char* str_upper(char* str);
 
+/**
+ * Counts occurrences of a character within a string.
+ * @param str  to count occurrences within
+ * @param ch   to count occurrences of
+ * @return     number of occurrences
+ */
+size_t str_count_char(char* str, char ch);
+
 #endif

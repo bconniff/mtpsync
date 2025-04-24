@@ -17,18 +17,14 @@
 #include "fs.h"
 #include "io.h"
 #include "hash.h"
+#include "sync.h"
 
-#define MTP_PULL_LIST_INIT_SIZE 512
+#define MTP_PUSH_LIST_INIT_SIZE 512
 
 typedef struct {
     char* from_path;
     char* to_path;
 } MtpPushParams;
-
-typedef struct {
-    char* source;
-    char* target;
-} MtpPushSpec;
 
 typedef struct {
     int cleanup;
@@ -100,39 +96,27 @@ static inline int str_sort_alpha(const void* a, const void* b) {
     return strcmp(aa, bb);
 }
 
-static void free_push_spec(void* data) {
-    if (data) {
-        MtpPushSpec* push_spec = (MtpPushSpec*)data;
-        free(push_spec->target);
-        free(push_spec);
-    }
-}
-
-static MtpPushResult mtp_mkdir_try(Device* dev, char* path) {
-    MtpPushResult result = {
-        .status = MTP_STATUS_EFAIL,
-        .id = 0
-    };
-
+static MtpStatusCode mtp_mkdir(Device* dev, SyncPlan* plan) {
+    MtpStatusCode code = MTP_STATUS_EFAIL;
     DeviceFile* file = NULL;
     char* new_path = NULL;
     char* path_dname = NULL;
     char* path_bname = NULL;
 
-    Hash* file_hash = dev->files;
+    char* path = plan->target;
     if (strcmp(path, "/") == 0) {
-        result.status = MTP_STATUS_OK;
+        code = MTP_STATUS_OK;
         goto done;
     }
 
+    Hash* file_hash = dev->files;
     DeviceFile* existing_file = hash_get(file_hash, path);
     if (existing_file) {
         if (!existing_file->is_folder) {
-            result.status = MTP_STATUS_EEXIST;
+            code = MTP_STATUS_EEXIST;
             goto done;
         }
-        result.status = MTP_STATUS_OK;
-        result.id = existing_file->id;
+        code = MTP_STATUS_OK;
         goto done;
     }
 
@@ -162,7 +146,7 @@ static MtpPushResult mtp_mkdir_try(Device* dev, char* path) {
     printf("%s: %s/: ", MTP_MKDIR_MSG, path);
     if (file->id == 0) {
         printf("Failed!\n");
-        result.status = MTP_STATUS_EDEVICE;
+        code = MTP_STATUS_EDEVICE;
         LIBMTP_Dump_Errorstack(dev->device);
         LIBMTP_Clear_Errorstack(dev->device);
         goto done;
@@ -171,9 +155,7 @@ static MtpPushResult mtp_mkdir_try(Device* dev, char* path) {
 
     if (device_add_file(dev, file) != DEVICE_STATUS_OK) goto done;
 
-    result.status = MTP_STATUS_OK;
-    result.id = file->id;
-
+    code = MTP_STATUS_OK;
     file = NULL;
     new_path = NULL;
 
@@ -182,87 +164,51 @@ done:
     free(new_path);
     free(path_bname);
     free(path_dname);
-    return result;
+    return code;
 }
 
-static MtpPushResult mtp_mkdirp(Device* dev, char* path) {
-    MtpPushResult result = {
-        .status = MTP_STATUS_EFAIL,
-        .id = 0,
-    };
-
-    char* tmp = fs_resolve_cwd("/", path);
-    if (!tmp) goto done;
-
-    for (char* p = tmp+1; *p; p++) {
-        if (*p == '/') {
-            *p = 0;
-            MtpStatusCode status = mtp_mkdir_try(dev, tmp).status;
-            if (status != MTP_STATUS_OK) goto done;
-            *p = '/';
-        }
-    }
-
-    result = mtp_mkdir_try(dev, tmp);
-
-done:
-    free(tmp);
-    return result;
-}
-
-static MtpPushResult mtp_ensure_dir(Device* dev, MtpPushSpec* spec) {
-    MtpPushResult result = {
-        .status = MTP_STATUS_EFAIL,
-        .id = 0,
-    };
-
-    char* dname = NULL;
-
-    dname = fs_dirname(spec->target);
-    if (!dname) goto done;
-
-    result = mtp_mkdirp(dev, dname);
-
-done:
-    free(dname);
-    return result;
-}
-
-static MtpPushResult mtp_send_file(Device* dev, uint32_t parent_id, MtpPushSpec* spec) {
-    MtpPushResult result = {
-        .status = MTP_STATUS_EFAIL,
-        .id = 0,
-    };
-
+static MtpStatusCode mtp_send_file(Device* dev, SyncPlan* plan) {
+    MtpStatusCode code = MTP_STATUS_EFAIL;
     DeviceFile* file = NULL;
     LIBMTP_file_t* mtp_file = NULL;
     char* new_path = NULL;
+    char* dname = NULL;
     char* bname = NULL;
     char* lcname = NULL;
 
     Hash* file_hash = dev->files;
-    DeviceFile* existing_file = hash_get(file_hash, spec->target);
+    DeviceFile* existing_file = hash_get(file_hash, plan->target);
     if (existing_file) {
-        fprintf(stderr, "File already exists: %s (%u), skipping\n", spec->target, existing_file->id);
-        result.status = MTP_STATUS_EEXIST;
+        fprintf(stderr, "File already exists: %s (%u), skipping\n", plan->target, existing_file->id);
+        code = MTP_STATUS_EEXIST;
         goto done;
     }
 
     struct stat s;
-    if (lstat(spec->source, &s) != 0) goto done;
+    if (lstat(plan->source, &s) != 0) goto done;
 
-    new_path = strdup(spec->target);
+    new_path = strdup(plan->target);
     if (!new_path) goto done;
 
-    bname = fs_basename(spec->target);
+    dname = fs_dirname(plan->target);
+    if (!dname) goto done;
+
+    bname = fs_basename(plan->target);
     if (!bname) goto done;
 
     lcname = str_lower(bname);
     if (!lcname) goto done;
 
     if (s.st_size > dev->capacity) {
-        result.status = MTP_STATUS_ENOSPC;
+        code = MTP_STATUS_ENOSPC;
         goto done;
+    }
+
+    uint32_t parent_id = 0;
+    if (strcmp("/", dname) != 0) {
+        DeviceFile* parent_dir = hash_get(file_hash, dname);
+        if (!parent_dir || !parent_dir->is_folder) goto done;
+        parent_id = parent_dir->id;
     }
 
     mtp_file = LIBMTP_new_file_t();
@@ -289,8 +235,8 @@ static MtpPushResult mtp_send_file(Device* dev, uint32_t parent_id, MtpPushSpec*
         }
     }
 
-    MtpOperationData op = { .name = MTP_PUSH_MSG, .file = spec->target };
-    if (LIBMTP_Send_File_From_File(dev->device, spec->source, mtp_file, mtp_progress, &op) != 0) {
+    MtpOperationData op = { .name = MTP_PUSH_MSG, .file = plan->target };
+    if (LIBMTP_Send_File_From_File(dev->device, plan->source, mtp_file, mtp_progress, &op) != 0) {
         fprintf(stdout, "\n");
         fprintf(stderr, "Error getting file from MTP device.\n");
         LIBMTP_Dump_Errorstack(dev->device);
@@ -304,80 +250,82 @@ static MtpPushResult mtp_send_file(Device* dev, uint32_t parent_id, MtpPushSpec*
     if (device_add_file(dev, file) != DEVICE_STATUS_OK) goto done;
     dev->capacity -= s.st_size;
 
-    result.status = MTP_STATUS_OK;
-    result.id = file->id;
-
+    code = MTP_STATUS_OK;
     file = NULL;
     new_path = NULL;
 
 done:
     free(file);
     free(new_path);
+    free(dname);
     free(bname);
     free(lcname);
     LIBMTP_destroy_file_t(mtp_file);
-    return result;
+    return code;
 }
 
-static MtpStatusCode mtp_cleanup_files(Device* dev, MtpSyncSpec* sync_spec, List* push_specs) {
+static MtpStatusCode mtp_rm_file(Device* dev, SyncPlan* plan) {
     MtpStatusCode code = MTP_STATUS_EFAIL;
-    List* files_after = NULL;
-    List* files_stray = NULL;
-    Hash* target_hash = NULL;
-    char* target = NULL;
+    HashEntry* entry = NULL;
 
-    files_after = device_filter_files(dev, sync_spec->to_path);
-    if (!files_after) goto done;
+    entry = hash_remove(dev->files, plan->target);
+    if (!entry) goto done;
 
-    files_stray = list_new(list_size(files_after));
-    if (!files_stray) goto done;
+    DeviceFile* f = hash_entry_value(entry);
 
-    target_hash = hash_new_str(list_size(push_specs) * 2);
-    if (!target_hash) goto done;
-
-    for (size_t i = 0; i < list_size(push_specs); i++) {
-        MtpPushSpec* spec = list_get(push_specs, i);
-
-        target = strdup(spec->target);
-        if (!target) goto done;
-
-        do {
-            HashPutResult r = hash_put(target_hash, target, spec);
-            int is_existing = r.old_entry != NULL;
-            free(hash_entry_key(r.old_entry));
-            hash_entry_free(r.old_entry);
-            if (r.status != HASH_STATUS_OK) goto done;
-
-            if (is_existing) break;
-
-            target = fs_dirname(target);
-            if (!target) goto done;
-        } while (strcmp(target, "/") != 0);
-
-        target = NULL;
+    printf("%s: %s%s: ", MTP_RM_MSG, f->path, f->is_folder ? "/" : "");
+    if (LIBMTP_Delete_Object(dev->device, f->id) != 0) {
+        printf("Failed!\n");
+        code = MTP_STATUS_EDEVICE;
+        LIBMTP_Dump_Errorstack(dev->device);
+        LIBMTP_Clear_Errorstack(dev->device);
+        goto done;
     }
-
-    for (size_t i = 0; i < list_size(files_after); i++) {
-        DeviceFile* f = list_get(files_after, i);
-        if (!hash_get(target_hash, f->path)) {
-            if (list_push(files_stray, f) != LIST_STATUS_OK) goto done;
-        }
-    }
-
-    mtp_rm_files(dev, files_stray);
+    printf("OK\n");
 
     code = MTP_STATUS_OK;
 
 done:
-    free(target);
-    list_free(files_stray);
-    list_free(files_after);
-    hash_free(target_hash);
+    device_hash_entry_free(entry);
+    return code;
+}
+
+static inline void* get_file_path(void* item) {
+    DeviceFile* df = item;
+    return df->path;
+}
+
+static inline MtpStatusCode execute_sync_plan(Device* dev, List* plans) {
+    MtpStatusCode code = MTP_STATUS_OK;
+
+    for (size_t i = 0; i < list_size(plans); i++) {
+        SyncPlan* plan = list_get(plans, i);
+
+        switch (plan->action) {
+            case SYNC_ACTION_MKDIR:
+                code = mtp_mkdir(dev, plan);
+                break;
+
+            case SYNC_ACTION_PUSH:
+                code = mtp_send_file(dev, plan);
+                break;
+
+            case SYNC_ACTION_RM:
+                code = mtp_rm_file(dev, plan);
+                break;
+        }
+
+        if (code != MTP_STATUS_OK) break;
+    }
+
     return code;
 }
 
 static MtpStatusCode mtp_push_callback(Device* dev, void* data) {
     MtpStatusCode code = MTP_STATUS_EFAIL;
+    List* plans = NULL;
+    List* to_files = NULL;
+    List* to_file_names = NULL;
     List* push_specs = NULL;
     char* dname = NULL;
 
@@ -387,58 +335,43 @@ static MtpStatusCode mtp_push_callback(Device* dev, void* data) {
         goto done;
     }
 
-    Hash* file_hash = dev->files;
     MtpSyncSpec* sync_spec = (MtpSyncSpec*)data;
-    List* push_specs_pre = sync_spec->push_specs;
 
-    push_specs = list_new(list_size(push_specs_pre));
-    if (!push_specs) goto done;
+    to_files = device_filter_files(dev, sync_spec->to_path);
+    if (!to_files) goto done;
 
-    for (size_t i = 0; i < list_size(push_specs_pre); i++) {
-        MtpPushSpec* push_spec = list_get(push_specs_pre, i);
-        DeviceFile* f = hash_get(file_hash, push_spec->target);
-        if (f) {
-            printf("%s: %s\n", MTP_SKIP_MSG, push_spec->target);
-        } else {
-            if (list_push(push_specs, push_spec) != LIST_STATUS_OK) goto done;
-            printf("%s: %s\n", MTP_PUSH_MSG, push_spec->target);
-        }
-    }
+    to_file_names = list_map(to_files, get_file_path);
+    if (!to_file_names) goto done;
 
-    if (list_size(push_specs)) {
+    plans = sync_plan(sync_spec->push_specs, to_file_names);
+    if (!plans) goto done;
+
+    sync_plan_print(plans);
+
+    if (list_size(plans)) {
         if (!io_confirm("Proceed [y/n]? ")) {
             code = MTP_STATUS_EREJECT;
             goto done;
         }
-
-        for (size_t i = 0; i < list_size(push_specs); i++) {
-            MtpPushSpec* push_spec = list_get(push_specs, i);
-            MtpPushResult dir_result = mtp_ensure_dir(dev, push_spec);
-            if (dir_result.status != MTP_STATUS_OK) goto done;
-
-            MtpPushResult file_result = mtp_send_file(dev, dir_result.id, push_spec);
-            if (file_result.status != MTP_STATUS_OK && file_result.status != MTP_STATUS_EEXIST) goto done;
-        }
+        if (execute_sync_plan(dev, plans) != MTP_STATUS_OK) goto done;
     } else {
         printf("All files already present on the device.\n");
-        code = MTP_STATUS_OK;
-    }
-
-    if (sync_spec->cleanup) {
-        if (mtp_cleanup_files(dev, sync_spec, push_specs_pre) != MTP_STATUS_OK) goto done;
     }
 
     code = MTP_STATUS_OK;
 
 done:
     free(dname);
+    list_free(to_files);
+    list_free(to_file_names);
+    list_free_deep(plans, (ListItemFreeFn)sync_plan_free);
     list_free(push_specs);
     return code;
 }
 
 MtpStatusCode mtp_push(MtpDeviceParams* mtp_params, char* from_path, char* to_path, int cleanup) {
     MtpStatusCode code = MTP_STATUS_EFAIL;
-    MtpPushSpec* push_spec = NULL;
+    SyncSpec* push_spec = NULL;
     List* push_specs = NULL;
     List* files = NULL;
     List* files_sorted = NULL;
@@ -446,7 +379,7 @@ MtpStatusCode mtp_push(MtpDeviceParams* mtp_params, char* from_path, char* to_pa
     char* to_path_r = NULL;
     char* target = NULL;
 
-    push_specs = list_new(MTP_PULL_LIST_INIT_SIZE);
+    push_specs = list_new(MTP_PUSH_LIST_INIT_SIZE);
     if (!push_specs) goto done;
 
     from_path_r = fs_resolve(from_path);
@@ -469,18 +402,18 @@ MtpStatusCode mtp_push(MtpDeviceParams* mtp_params, char* from_path, char* to_pa
     size_t from_path_len = strlen(from_path_r);
     for (size_t i = 0; i < list_size(files_sorted); i++) {
         char* target = NULL;
-        MtpPushSpec* push_spec = NULL;
+        SyncSpec* push_spec = NULL;
 
         char* source = list_get(files_sorted, i);
         target = fs_path_join(to_path_r, source + from_path_len);
         if (!target) goto done;
 
-        push_spec = malloc(sizeof(MtpPushSpec));
+        push_spec = sync_spec_new(source, target);
         if (!push_spec) goto done;
-        push_spec->source = source;
-        push_spec->target = target;
 
         if (list_push(push_specs, push_spec) != LIST_STATUS_OK) goto done;
+
+        free(target);
 
         push_spec = NULL;
         target = NULL;
@@ -494,12 +427,12 @@ MtpStatusCode mtp_push(MtpDeviceParams* mtp_params, char* from_path, char* to_pa
     code = mtp_each_device(mtp_push_callback, mtp_params, &sync_spec);
 
 done:
-    free(push_spec);
+    sync_spec_free(push_spec);
     free(target);
     free(from_path_r);
     free(to_path_r);
     list_free(files_sorted);
     list_free_deep(files, free);
-    list_free_deep(push_specs, free_push_spec);
+    list_free_deep(push_specs, (ListItemFreeFn)sync_spec_free);
     return code;
 }

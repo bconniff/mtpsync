@@ -208,6 +208,24 @@ void hash_free(Hash* h);
 void hash_entry_free(HashEntry* h);
 
 /**
+ * Free an individual HashEntry and its key.
+ * @param h  hash entry to free
+ */
+void hash_entry_free_k(HashEntry* h);
+
+/**
+ * Free an individual HashEntry and its value.
+ * @param h  hash entry to free
+ */
+void hash_entry_free_v(HashEntry* h);
+
+/**
+ * Free an individual HashEntry, its key and value.
+ * @param h  hash entry to free
+ */
+void hash_entry_free_kv(HashEntry* h);
+
+/**
  * Free the hash and all keys/values using the specified callback. The provided
  * callback should also use hash_entry_free to free the entry itself when done.
  * @param h        hash to free

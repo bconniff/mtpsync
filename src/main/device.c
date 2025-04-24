@@ -19,14 +19,14 @@ static inline int device_file_sort_alpha(const void* a, const void* b) {
     return result;
 }
 
-static void device_file_free(DeviceFile* f) {
+void device_file_free(DeviceFile* f) {
     if (f) {
         free(f->path);
         free(f);
     }
 }
 
-static void device_hash_entry_free(HashEntry* e) {
+void device_hash_entry_free(HashEntry* e) {
     if (e) {
         device_file_free(hash_entry_value(e));
         hash_entry_free(e);

@@ -83,3 +83,13 @@ char* str_upper(char* str) {
 
     return dup;
 }
+
+inline size_t str_count_char(char* str, char ch) {
+    size_t count = 0;
+    while (*str) {
+        if (*str++ == ch) {
+            count++;
+        }
+    }
+    return count;
+}

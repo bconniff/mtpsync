@@ -302,3 +302,19 @@ error:
 inline List* hash_unique_strs(List* items) {
     return hash_unique(items, hash_code_str, hash_cmp_str);
 }
+
+inline void hash_entry_free_k(HashEntry* e) {
+    free(hash_entry_key(e));
+    hash_entry_free(e);
+}
+
+inline void hash_entry_free_v(HashEntry* e) {
+    free(hash_entry_value(e));
+    hash_entry_free(e);
+}
+
+inline void hash_entry_free_kv(HashEntry* e) {
+    free(hash_entry_key(e));
+    free(hash_entry_value(e));
+    hash_entry_free(e);
+}

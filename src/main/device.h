@@ -83,4 +83,16 @@ DeviceStatusCode device_add_file(Device* d, DeviceFile* f);
  */
 void device_free(Device* d);
 
+/**
+ * Free a device file.
+ * @param df  device file to free
+ */
+void device_file_free(DeviceFile* df);
+
+/**
+ * Free a hash entry from the device file hash.
+ * @param e  device file hash entry to free
+ */
+void device_hash_entry_free(HashEntry* e);
+
 #endif
