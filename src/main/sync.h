@@ -11,22 +11,29 @@ typedef enum {
 } SyncAction;
 
 typedef struct {
+    char* path;
+    int is_folder;
+} SyncFile;
+
+typedef struct {
     char* source;
     char* target;
 } SyncSpec;
 
 typedef struct {
-    char* source;
-    char* target;
+    SyncFile* source;
+    SyncFile* target;
     SyncAction action;
 } SyncPlan;
 
-SyncSpec* sync_spec_new(char* source, char* target);
-void sync_spec_free(SyncSpec* plan);
-
-SyncPlan* sync_plan_new(char* source, char* target, SyncAction a);
+void sync_file_free(SyncFile* f);
+SyncFile* sync_file_new(char* path, int is_folder);
 void sync_plan_free(SyncPlan* plan);
-List* sync_plan(List* specs, List* target_files);
+SyncPlan* sync_plan_new(SyncFile* source, SyncFile* target, SyncAction action);
+void sync_spec_free(SyncSpec* spec);
+SyncSpec* sync_spec_new(char* source, char* target);
+
+List* sync_plan_create(List* source_files, List* target_files, List* specs, int cleanup);
 void sync_plan_print(List* plan);
 
 #endif

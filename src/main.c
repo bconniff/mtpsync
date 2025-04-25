@@ -14,6 +14,8 @@
 #include "main/fs.h"
 #include "main/io.h"
 #include "main/args.h"
+#include "main/sync.h"
+#include "main/array.h"
 
 typedef struct {
     char* device_id;
@@ -164,7 +166,7 @@ static MtpStatusCode mtpsync(int argc, char** argv, MtpArgs* args) {
     }
 
     char* cmd_name = argv[1];
-    size_t cmds_size = sizeof(cmds)/sizeof(Command);
+    size_t cmds_size = ARRAY_LEN(cmds);
     for (size_t i = 0; i < cmds_size; i++) {
         Command c = cmds[i];
         if (strcmp(c.cmd_name, cmd_name) == 0) {
@@ -186,7 +188,7 @@ int main(int argc, char** argv) {
         { .arg_long = "storage", .arg_short = 's', .arg_fn = storage_arg },
     };
 
-    size_t defc = sizeof(defv)/sizeof(ArgDefinition);
+    size_t defc = ARRAY_LEN(defv);
     ArgParseResult result = arg_parse(argc, argv, defc, defv, &args);
 
     if (result.status == ARG_STATUS_OK) {

@@ -33,10 +33,31 @@ static inline int device_file_sort_deletion(const void* a, const void* b) {
     return cmp;
 }
 
+static inline void* map_device_file_to_sync_plan(void* item) {
+    SyncFile* target = NULL;
+    SyncPlan* plan = NULL;
+
+    DeviceFile* df = item;
+    target = sync_file_new(df->path, df->is_folder);
+    if (!target) goto error;
+
+    plan = sync_plan_new(NULL, target, SYNC_ACTION_RM);
+    if (!plan) goto error;
+
+    sync_file_free(target);
+    return plan;
+
+error:
+    sync_file_free(target);
+    sync_plan_free(plan);
+    return NULL;
+}
+
 MtpStatusCode mtp_rm_files(Device* dev, List* rm_files) {
     MtpStatusCode code = MTP_STATUS_EFAIL;
     List* rm_files_unique = NULL;
     List* rm_files_order = NULL;
+    List* plans = NULL;
 
     if (!list_size(rm_files)) {
         printf("No files to delete.\n");
@@ -52,28 +73,17 @@ MtpStatusCode mtp_rm_files(Device* dev, List* rm_files) {
     rm_files_order = list_sort(rm_files_unique, device_file_sort_deletion);
     if (!rm_files_order) goto done;
 
-    for (size_t i = 0; i < list_size(rm_files_order); i++) {
-        DeviceFile* f = list_get(rm_files_order, i);
-        printf("%s: %s%s\n", MTP_RM_MSG, f->path, f->is_folder ? "/" : "");
-    }
+    plans = list_map(rm_files_order, map_device_file_to_sync_plan);
+    if (!plans) goto done;
+
+    sync_plan_print(plans);
 
     if (!io_confirm("Proceed [y/n]? ")) {
         code = MTP_STATUS_EREJECT;
         goto done;
     }
 
-    for (size_t i = 0; i < list_size(rm_files_order); i++) {
-        DeviceFile* f = list_get(rm_files_order, i);
-        printf("%s: %s%s: ", MTP_RM_MSG, f->path, f->is_folder ? "/" : "");
-        if (LIBMTP_Delete_Object(dev->device, f->id) != 0) {
-            printf("Failed!\n");
-            code = MTP_STATUS_EDEVICE;
-            LIBMTP_Dump_Errorstack(dev->device);
-            LIBMTP_Clear_Errorstack(dev->device);
-            goto done;
-        }
-        printf("OK\n");
-    }
+    if (mtp_execute_sync_plan(dev, plans) != MTP_STATUS_OK) goto done;
 
     code = MTP_STATUS_OK;
 

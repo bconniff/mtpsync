@@ -8,6 +8,7 @@
 
 #include "device.h"
 #include "color.h"
+#include "sync.h"
 
 #define MTP_SKIP_MSG   C_BOLD C_YELLOW "SKIP" C_RESET ///< skipped message
 #define MTP_PULL_MSG   C_BOLD C_CYAN "PULL" C_RESET   ///< pull file message
@@ -74,5 +75,37 @@ MtpStatusCode mtp_each_device(MtpDeviceFn callback, MtpDeviceParams* params, voi
  * @param data   pointer to MtpOperationData representing the operation
  */
 int mtp_progress(const uint64_t sent, const uint64_t total, void const * const data);
+
+/**
+ * Send a local file to an MTP device.
+ * @param dev   device to operate on
+ * @param plan  plan for file to send
+ * @return      status code
+ */
+MtpStatusCode mtp_send_file(Device* dev, SyncPlan* plan);
+
+/**
+ * Delete a file or directory from an MTP device.
+ * @param dev   device to operate on
+ * @param plan  plan for file to delete
+ * @return      status code
+ */
+MtpStatusCode mtp_rm_file(Device* dev, SyncPlan* plan);
+
+/**
+ * Create a directory on an MTP device.
+ * @param dev   device to operate on
+ * @param plan  plan for creating the directory
+ * @return      status code
+ */
+MtpStatusCode mtp_mkdir(Device* dev, SyncPlan* plan);
+
+/**
+ * Execute sync plan for a device.
+ * @param dev   device to operate on
+ * @param plan  list of plans to execute
+ * @return      status code
+ */
+MtpStatusCode mtp_execute_sync_plan(Device* dev, List* plan);
 
 #endif
