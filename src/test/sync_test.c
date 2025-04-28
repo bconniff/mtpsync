@@ -15,7 +15,7 @@ typedef struct {
     char* path;
 } ExpectedOperation;
 
-static void assert_cleanup(List* source_files, List* target_files, List* specs) {
+static void assert_push_cleanup(List* source_files, List* target_files, List* specs) {
     ExpectedOperation expected[] = {
         { SYNC_ACTION_RM, "/tgt/four/five/six/31.mp3" },
         { SYNC_ACTION_RM, "/tgt/four/five/six" },
@@ -34,7 +34,7 @@ static void assert_cleanup(List* source_files, List* target_files, List* specs) 
         { SYNC_ACTION_PUSH, "/tgt/three/21.mp3" },
     };
 
-    List* plans = sync_plan_create(source_files, target_files, specs, 1);
+    List* plans = sync_plan_push(source_files, target_files, specs, 1);
     assert(plans);
     assert(ARRAY_LEN(expected) == list_size(plans));
     for (size_t i = 0; i < ARRAY_LEN(expected); i++) {
@@ -45,7 +45,7 @@ static void assert_cleanup(List* source_files, List* target_files, List* specs) 
     list_free_deep(plans, (ListItemFreeFn)sync_plan_free);
 }
 
-static void assert_nocleanup(List* source_files, List* target_files, List* specs) {
+static void assert_push_nocleanup(List* source_files, List* target_files, List* specs) {
     ExpectedOperation expected[] = {
         { SYNC_ACTION_MKDIR, "/tgt/three" },
         { SYNC_ACTION_MKDIR, "/tgt/test/two" },
@@ -60,7 +60,7 @@ static void assert_nocleanup(List* source_files, List* target_files, List* specs
         { SYNC_ACTION_PUSH, "/tgt/three/21.mp3" },
     };
 
-    List* plans = sync_plan_create(source_files, target_files, specs, 0);
+    List* plans = sync_plan_push(source_files, target_files, specs, 0);
     assert(plans);
     assert(ARRAY_LEN(expected) == list_size(plans));
     for (size_t i = 0; i < ARRAY_LEN(expected); i++) {
@@ -71,7 +71,7 @@ static void assert_nocleanup(List* source_files, List* target_files, List* specs
     list_free_deep(plans, (ListItemFreeFn)sync_plan_free);
 }
 
-int sync_test(int sz) {
+static int sync_push_test() {
     char* source_file_paths[] = {
         "/src/test/one/01.mp3",
         "/src/test/one/02.mp3",
@@ -109,12 +109,68 @@ int sync_test(int sz) {
         assert(list_push(target_files, sync_file_new(target_file_paths[i], 0)) == LIST_STATUS_OK);
     }
 
-    assert_cleanup(source_files, target_files, specs);
-    assert_nocleanup(source_files, target_files, specs);
+    assert_push_cleanup(source_files, target_files, specs);
+    assert_push_nocleanup(source_files, target_files, specs);
 
     list_free_deep(source_files, (ListItemFreeFn)sync_file_free);
     list_free_deep(target_files, (ListItemFreeFn)sync_file_free);
     list_free_deep(specs, (ListItemFreeFn)sync_spec_free);
 
+    return 0;
+}
+
+static int sync_rm_test() {
+    char* rm_file_paths[] = {
+        "/test/one/01.mp3",
+        "/test/one/01.mp3",
+        "/test/one/02.mp3",
+        "/test/one/03.mp3",
+        "/test/one/nested/subfolder/04.mp3",
+    };
+    char* rm_dir_paths[] = {
+        "/test/one",
+        "/test/one/nested",
+        "/test/one/nested/subfolder",
+        "/test/one",
+    };
+
+    char* expected[] = {
+        "/test/one/nested/subfolder/04.mp3",
+        "/test/one/nested/subfolder",
+        "/test/one/01.mp3",
+        "/test/one/02.mp3",
+        "/test/one/03.mp3",
+        "/test/one/nested",
+        "/test/one",
+    };
+
+    List* rm_files = list_new(ARRAY_LEN(rm_file_paths)+ARRAY_LEN(rm_dir_paths));
+    assert(rm_files);
+
+    for (size_t i = 0; i < ARRAY_LEN(rm_dir_paths); i++) {
+        assert(list_push(rm_files, sync_file_new(rm_dir_paths[i], 1)) == LIST_STATUS_OK);
+    }
+    for (size_t i = 0; i < ARRAY_LEN(rm_file_paths); i++) {
+        assert(list_push(rm_files, sync_file_new(rm_file_paths[i], 0)) == LIST_STATUS_OK);
+    }
+
+    List* plans = sync_plan_rm(rm_files);
+    assert(plans);
+    assert(ARRAY_LEN(expected) == list_size(plans));
+    for (size_t i = 0; i < ARRAY_LEN(expected); i++) {
+        SyncPlan* plan = list_get(plans, i);
+        assert(SYNC_ACTION_RM == plan->action);
+        //printf("%s = %s\n", expected[i], plan->target->path);
+        assert(strcmp(expected[i], plan->target->path) == 0);
+    }
+    list_free_deep(plans, (ListItemFreeFn)sync_plan_free);
+    list_free_deep(rm_files, (ListItemFreeFn)sync_file_free);
+
+    return 0;
+}
+
+int sync_test() {
+    sync_push_test();
+    sync_rm_test();
     return 0;
 }

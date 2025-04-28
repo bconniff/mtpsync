@@ -9,6 +9,7 @@
 #include "device.h"
 #include "fs.h"
 #include "str.h"
+#include "sync.h"
 
 #define DEVICE_HASH_INIT_SIZE 512
 
@@ -210,4 +211,3 @@ done:
 List* device_filter_files(Device* dev, char* path) {
     return device_filter_files_sorted(dev, path, device_file_sort_alpha);
 }
-

@@ -60,7 +60,7 @@ error:
 }
 
 inline size_t list_size(List* l) {
-    return l->size;
+    return l ? l->size : 0;
 }
 
 ListStatusCode list_resize(List* l, size_t capacity) {

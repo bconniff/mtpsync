@@ -22,6 +22,17 @@ typedef struct {
 
 typedef SyncStatusCode (*SyncAncestorFn)(SyncFile* target, int is_ancestor, void* data);
 
+static inline size_t sync_file_hc(void* item) {
+    SyncFile* sf = item;
+    return hash_code_str(sf->path);
+}
+
+static inline int sync_file_cmp(void* a, void* b) {
+    SyncFile* aa = a;
+    SyncFile* bb = b;
+    return hash_cmp_str(aa->path, bb->path);
+}
+
 static inline int sync_plan_cmp(const void* a, const void* b) {
     const SyncPlan* aa = *(const SyncPlan**)a;
     const SyncPlan* bb = *(const SyncPlan**)b;
@@ -237,7 +248,44 @@ error:
     return NULL;
 }
 
-List* sync_plan_create(List* source_files, List* target_files, List* specs, int cleanup) {
+List* sync_plan_rm(List* rm_files) {
+    SyncPlan* plan = NULL;
+    List* rm_files_unique = NULL;
+    List* plans = NULL;
+    List* plans_sorted = NULL;
+
+    rm_files_unique = hash_unique(rm_files, sync_file_hc, sync_file_cmp);
+    if (!rm_files_unique) goto error;
+
+    plans = list_new(list_size(rm_files_unique));
+    if (!plans) goto error;
+
+    for (size_t i = 0; i < list_size(rm_files_unique); i++) {
+        SyncFile* f = list_get(rm_files_unique, i);
+        plan = sync_plan_new(NULL, f, SYNC_ACTION_RM);
+        if (!plan) goto error;
+
+        if (list_push(plans, plan) != LIST_STATUS_OK) goto error;
+        plan = NULL;
+    }
+
+    plans_sorted = list_sort(plans, sync_plan_cmp);
+    if (!plans_sorted) goto error;
+
+    goto done; // success
+
+error:
+    list_free_deep(plans, (ListItemFreeFn)sync_plan_free);
+    plans = NULL; // don't double-free
+
+done:
+    sync_plan_free(plan);
+    list_free(rm_files_unique);
+    list_free(plans);
+    return plans_sorted;
+}
+
+List* sync_plan_push(List* source_files, List* target_files, List* specs, int cleanup) {
     Hash* source_hash = NULL;
     Hash* target_hash = NULL;
     Hash* expected_hash = NULL;

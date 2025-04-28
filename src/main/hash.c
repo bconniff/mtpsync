@@ -224,7 +224,7 @@ error:
 }
 
 inline size_t hash_size(Hash* h) {
-    return h->size;
+    return h ? h->size : 0;
 }
 
 void hash_entry_free(HashEntry* h) {
@@ -279,15 +279,15 @@ List* hash_unique(List* items, HashCodeFn hc_fn, HashCmpFn cmp_fn) {
     if (!unique_hash) goto error;
 
     for (size_t i = 0; i < list_size(items); i++) {
-        char* str = list_get(items, i);
-        HashPutResult r = hash_put(unique_hash, str, str);
+        void* item = list_get(items, i);
+        HashPutResult r = hash_put(unique_hash, item, item);
         int is_existing = r.old_entry != NULL;
         hash_entry_free(r.old_entry);
         if (r.status != HASH_STATUS_OK) goto error;
 
         if (is_existing) continue;
 
-        if (list_push(result, str) != LIST_STATUS_OK) goto error;
+        if (list_push(result, item) != LIST_STATUS_OK) goto error;
     }
 
     hash_free(unique_hash);

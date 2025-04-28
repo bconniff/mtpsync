@@ -10,71 +10,27 @@
 #include "str.h"
 #include "fs.h"
 #include "io.h"
+#include "map.h"
 
 #define MTP_RM_INIT_SIZE 512
 
-static inline int device_file_sort_deletion(const void* a, const void* b) {
-    const DeviceFile* aa = *(const DeviceFile**)a;
-    const DeviceFile* bb = *(const DeviceFile**)b;
-
-    int cmp = 0;
-
-    // first, if both folders, sort longest path first
-    if (aa->is_folder && bb->is_folder) {
-        if (!cmp) cmp = str_count_char(bb->path, '/') - str_count_char(aa->path, '/');
-    }
-
-    // next, sort folders after files
-    if (!cmp) cmp = (aa->is_folder ? 1 : 0) - (bb->is_folder ? 1 : 0);
-
-    // last, sort alphabetically
-    if (!cmp) cmp = strcmp(aa->path, bb->path);
-
-    return cmp;
-}
-
-static inline void* map_device_file_to_sync_plan(void* item) {
-    SyncFile* target = NULL;
-    SyncPlan* plan = NULL;
-
-    DeviceFile* df = item;
-    target = sync_file_new(df->path, df->is_folder);
-    if (!target) goto error;
-
-    plan = sync_plan_new(NULL, target, SYNC_ACTION_RM);
-    if (!plan) goto error;
-
-    sync_file_free(target);
-    return plan;
-
-error:
-    sync_file_free(target);
-    sync_plan_free(plan);
-    return NULL;
-}
-
 MtpStatusCode mtp_rm_files(Device* dev, List* rm_files) {
     MtpStatusCode code = MTP_STATUS_EFAIL;
-    List* rm_files_unique = NULL;
-    List* rm_files_order = NULL;
+    List* sync_files = NULL;
     List* plans = NULL;
 
-    if (!list_size(rm_files)) {
+    MapStatusCode map_status = MTP_STATUS_OK;
+    sync_files = list_map_data(rm_files, (ListMapDataFn)map_device_file_to_sync_file, &map_status);
+    if (!sync_files || (map_status != MAP_STATUS_OK)) goto done;
+
+    plans = sync_plan_rm(sync_files);
+    if (!plans) goto done;
+
+    if (!list_size(plans)) {
         printf("No files to delete.\n");
         code = MTP_STATUS_OK;
         goto done;
     }
-
-    rm_files_unique = hash_unique_strs(rm_files);
-    if (!rm_files_unique) goto done;
-
-    printf("Deleting files:\n");
-
-    rm_files_order = list_sort(rm_files_unique, device_file_sort_deletion);
-    if (!rm_files_order) goto done;
-
-    plans = list_map(rm_files_order, map_device_file_to_sync_plan);
-    if (!plans) goto done;
 
     sync_plan_print(plans);
 
@@ -88,8 +44,8 @@ MtpStatusCode mtp_rm_files(Device* dev, List* rm_files) {
     code = MTP_STATUS_OK;
 
 done:
-    list_free(rm_files_unique);
-    list_free(rm_files_order);
+    list_free_deep(sync_files, (ListItemFreeFn)sync_file_free);
+    list_free_deep(plans, (ListItemFreeFn)sync_plan_free);
     return code;
 }
 

@@ -19,6 +19,7 @@
 #include "hash.h"
 #include "sync.h"
 #include "array.h"
+#include "map.h"
 
 #define MTP_PUSH_LIST_INIT_SIZE 512
 
@@ -32,16 +33,6 @@ static inline int str_sort_alpha(const void* a, const void* b) {
     const char* aa = *(const char**)a;
     const char* bb = *(const char**)b;
     return strcmp(aa, bb);
-}
-
-static inline void* map_device_file_to_sync_file(void* item) {
-    DeviceFile* df = item;
-    return sync_file_new(df->path, df->is_folder);
-}
-
-static inline void* map_sync_spec_to_sync_file(void* item) {
-    SyncSpec* spec = item;
-    return sync_file_new(spec->source, 0);
 }
 
 static MtpStatusCode mtp_push_callback(Device* dev, void* data) {
@@ -64,13 +55,14 @@ static MtpStatusCode mtp_push_callback(Device* dev, void* data) {
     device_files = device_filter_files(dev, sync_spec->to_path);
     if (!device_files) goto done;
 
-    source_files = list_map(sync_spec->push_specs, map_sync_spec_to_sync_file);
-    if (!source_files) goto done;
+    MapStatusCode map_status = MTP_STATUS_OK;
+    source_files = list_map_data(sync_spec->push_specs, (ListMapDataFn)map_sync_spec_to_sync_file, &map_status);
+    if (!source_files || (map_status != MAP_STATUS_OK)) goto done;
 
-    target_files = list_map(device_files, map_device_file_to_sync_file);
-    if (!target_files) goto done;
+    target_files = list_map_data(device_files, (ListMapDataFn)map_device_file_to_sync_file, &map_status);
+    if (!target_files || (map_status != MAP_STATUS_OK)) goto done;
 
-    plans = sync_plan_create(source_files, target_files, sync_spec->push_specs, sync_spec->cleanup);
+    plans = sync_plan_push(source_files, target_files, sync_spec->push_specs, sync_spec->cleanup);
     if (!plans) goto done;
 
     sync_plan_print(plans);
