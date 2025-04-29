@@ -454,7 +454,7 @@ done:
 static MtpStatusCode local_mkdir(SyncPlan* plan) {
     char* path = plan->target->path;
     printf("%s: %s/: ", MTP_MKDIR_MSG, path);
-    if (fs_mkdirp(path) != FS_STATUS_OK) {
+    if (fs_mkdir(path) != FS_STATUS_OK) {
         printf("Failed!\n");
         fprintf(stderr, "fs_mkdir(%s) failed: ", path);
         perror(NULL);
