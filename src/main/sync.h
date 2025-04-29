@@ -18,7 +18,7 @@
 typedef enum {
     SYNC_ACTION_RM,    ///< Delete a file or directory
     SYNC_ACTION_MKDIR, ///< Create a new directory
-    SYNC_ACTION_PUSH,  ///< Transfer the file from the source to the target
+    SYNC_ACTION_XFER,  ///< Transfer the file from source to target
 } SyncAction;
 
 /**
@@ -115,8 +115,18 @@ List* sync_plan_push(List* source_files, List* target_files, List* specs, int cl
 
 /**
  * Print a sync plan to stdout for the user to review.
- * @param plan  to print
+ * @param plan      to print
+ * @param xfer_msg  message to print for file transfers
  */
-void sync_plan_print(List* plan);
+void sync_plan_print(List* plan, char* xfer_msg);
+
+/**
+ * Create a list of sync specs for provided files.
+ * @param files      files to create specs for
+ * @param from_path  path to transfer from
+ * @param to_path    path to transfer to
+ * @return           list of sync specs, or NULL in case of error
+ */
+List* sync_spec_create(List* files, char* from_path, char* to_path);
 
 #endif

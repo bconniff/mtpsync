@@ -150,6 +150,14 @@ error:
     return NULL;
 }
 
+static inline int mtp_progress(const uint64_t sent, const uint64_t total, void const * const data) {
+    MtpOperationData* op = (MtpOperationData*)data;
+    int percent = (sent*100)/total;
+    printf("\33[2K\r%s: %s: %d%%", op->name, op->file, percent);
+    fflush(stdout);
+    return 0;
+}
+
 static inline int match_device(Device* dev, MtpDeviceParams* params) {
     int device_match = 1;
     int storage_match = 1;
@@ -298,6 +306,28 @@ done:
     return code;
 }
 
+MtpStatusCode mtp_get_file(Device* dev, SyncPlan* plan) {
+    MtpStatusCode code = MTP_STATUS_EFAIL;
+    Hash* file_hash = dev->files;
+    DeviceFile* f = hash_get(file_hash, plan->source->path);
+    char* target = plan->target->path;
+
+    MtpOperationData op = { .name = MTP_PULL_MSG, .file = target };
+    if (LIBMTP_Get_File_To_File(dev->device, f->id, target, mtp_progress, &op) != 0) {
+        fprintf(stdout, "\n");
+        fprintf(stderr, "Error getting file from MTP device.\n");
+        LIBMTP_Dump_Errorstack(dev->device);
+        LIBMTP_Clear_Errorstack(dev->device);
+        goto done;
+    }
+    printf("\n");
+
+    code = MTP_STATUS_OK;
+
+done:
+    return code;
+}
+
 MtpStatusCode mtp_send_file(Device* dev, SyncPlan* plan) {
     MtpStatusCode code = MTP_STATUS_EFAIL;
     DeviceFile* file = NULL;
@@ -421,7 +451,59 @@ done:
     return code;
 }
 
-MtpStatusCode mtp_execute_sync_plan(Device* dev, List* plans) {
+static MtpStatusCode local_mkdir(SyncPlan* plan) {
+    char* path = plan->target->path;
+    printf("%s: %s/: ", MTP_MKDIR_MSG, path);
+    if (fs_mkdirp(path) != FS_STATUS_OK) {
+        printf("Failed!\n");
+        fprintf(stderr, "fs_mkdir(%s) failed: ", path);
+        perror(NULL);
+        return MTP_STATUS_EFAIL;
+    }
+    printf("OK\n");
+    return MTP_STATUS_OK;
+}
+
+static MtpStatusCode local_rm(SyncPlan* plan) {
+    char* path = plan->target->path;
+    printf("%s: %s%s: ", MTP_RM_MSG, path, plan->target->is_folder ? "/" : "");
+    if (fs_rm(path) != FS_STATUS_OK) {
+        printf("Failed!\n");
+        fprintf(stderr, "fs_rm(%s) failed: ", path);
+        perror(NULL);
+        return MTP_STATUS_EFAIL;
+    }
+    printf("OK\n");
+    return MTP_STATUS_OK;
+}
+
+MtpStatusCode mtp_execute_pull_plan(Device* dev, List* plans) {
+    MtpStatusCode code = MTP_STATUS_OK;
+
+    for (size_t i = 0; i < list_size(plans); i++) {
+        SyncPlan* plan = list_get(plans, i);
+
+        switch (plan->action) {
+            case SYNC_ACTION_MKDIR:
+                code = local_mkdir(plan);
+                break;
+
+            case SYNC_ACTION_XFER:
+                code = mtp_get_file(dev, plan);
+                break;
+
+            case SYNC_ACTION_RM:
+                code = local_rm(plan);
+                break;
+        }
+
+        if (code != MTP_STATUS_OK) break;
+    }
+
+    return code;
+}
+
+MtpStatusCode mtp_execute_push_plan(Device* dev, List* plans) {
     MtpStatusCode code = MTP_STATUS_OK;
 
     for (size_t i = 0; i < list_size(plans); i++) {
@@ -432,7 +514,7 @@ MtpStatusCode mtp_execute_sync_plan(Device* dev, List* plans) {
                 code = mtp_mkdir(dev, plan);
                 break;
 
-            case SYNC_ACTION_PUSH:
+            case SYNC_ACTION_XFER:
                 code = mtp_send_file(dev, plan);
                 break;
 
@@ -445,12 +527,4 @@ MtpStatusCode mtp_execute_sync_plan(Device* dev, List* plans) {
     }
 
     return code;
-}
-
-int mtp_progress(const uint64_t sent, const uint64_t total, void const * const data) {
-    MtpOperationData* op = (MtpOperationData*)data;
-    int percent = (sent*100)/total;
-    printf("\33[2K\r%s: %s: %d%%", op->name, op->file, percent);
-    fflush(stdout);
-    return 0;
 }

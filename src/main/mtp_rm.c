@@ -32,14 +32,14 @@ MtpStatusCode mtp_rm_files(Device* dev, List* rm_files) {
         goto done;
     }
 
-    sync_plan_print(plans);
+    sync_plan_print(plans, MTP_PUSH_MSG);
 
     if (!io_confirm("Proceed [y/n]? ")) {
         code = MTP_STATUS_EREJECT;
         goto done;
     }
 
-    if (mtp_execute_sync_plan(dev, plans) != MTP_STATUS_OK) goto done;
+    if (mtp_execute_push_plan(dev, plans) != MTP_STATUS_OK) goto done;
 
     code = MTP_STATUS_OK;
 

@@ -48,8 +48,11 @@ int fs_test(int sz) {
 
     int found = 0;
 
+    char* expect_file = fs_resolve("src/test/fs_test.c");
+    assert(expect_file);
+
     for (size_t i = 0; i < list_size(files); i++) {
-        if (strcmp("src/test/fs_test.c", list_get(files, i)) == 0) {
+        if (strcmp(expect_file, list_get(files, i)) == 0) {
             found = 1;
             break;
         }
@@ -63,13 +66,30 @@ int fs_test(int sz) {
     files = fs_collect_files("./src/test/fs_test.c");
     assert(files);
     assert(list_size(files) == 1);
-    assert(strcmp((char*)list_get(files, 0), "str/test/fs_test.c"));
+    assert(strcmp(expect_file, (char*)list_get(files, 0)) == 0);
     list_free_deep(files, free);
+    free(expect_file);
 
-    // TEST RESOLVE
+    // TEST COLLECT ANCESTORS
     char* cwd = getcwd(NULL, 0);
     assert(cwd);
 
+    files = fs_collect_ancestors(cwd);
+    assert(files);
+    assert(list_size(files) >= 1);
+    assert(strcmp("/", (char*)list_get(files, 0)) == 0);
+
+    found = 0;
+    for (size_t i = 0; i < list_size(files); i++) {
+        if (strcmp(cwd, list_get(files, i)) == 0) {
+            found = 1;
+            break;
+        }
+    }
+    assert(found);
+    list_free_deep(files, free);
+
+    // TEST RESOLVE
     assert_resolve("/", "/");
     assert_resolve("/", "///");
     assert_resolve("/abc", "/abc/");

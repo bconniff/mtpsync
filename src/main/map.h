@@ -23,11 +23,21 @@ typedef enum {
 SyncFile* map_device_file_to_sync_file(DeviceFile* df, MapStatusCode* code);
 
 /**
- * Convert a SyncSpec to a SyncFile.
+ * Convert the source of a SyncSpec to a SyncFile. Assumes the SyncSpec is a
+ * regular file, not a directory.
  * @param spec  SyncSpec to convert
  * @param code  output parameter pointer to a MapStatusCode
  * @return      newly created SyncFile
  */
-SyncFile* map_sync_spec_to_sync_file(SyncSpec* df, MapStatusCode* code);
+SyncFile* map_sync_spec_to_sync_file(SyncSpec* spec, MapStatusCode* code);
+
+/**
+ * Convert a path to a SyncFile. Assumes the path is a canonicalized path of a
+ * regular file, not a directory.
+ * @param path  path string to convert
+ * @param code  output parameter pointer to a MapStatusCode
+ * @return      newly created SyncFile
+ */
+SyncFile* map_path_to_sync_file(char* path, MapStatusCode* code);
 
 #endif

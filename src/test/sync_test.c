@@ -25,13 +25,13 @@ static void assert_push_cleanup(List* source_files, List* target_files, List* sp
         { SYNC_ACTION_MKDIR, "/tgt/test/two" },
         { SYNC_ACTION_MKDIR, "/tgt/test/one/nested" },
         { SYNC_ACTION_MKDIR, "/tgt/test/one/nested/subfolder" },
-        { SYNC_ACTION_PUSH, "/tgt/test/one/01.mp3" },
-        { SYNC_ACTION_PUSH, "/tgt/test/one/02.mp3" },
-        { SYNC_ACTION_PUSH, "/tgt/test/one/nested/subfolder/04.mp3" },
-        { SYNC_ACTION_PUSH, "/tgt/test/two/11.mp3" },
-        { SYNC_ACTION_PUSH, "/tgt/test/two/12.mp3" },
-        { SYNC_ACTION_PUSH, "/tgt/test/two/13.mp3" },
-        { SYNC_ACTION_PUSH, "/tgt/three/21.mp3" },
+        { SYNC_ACTION_XFER, "/tgt/test/one/01.mp3" },
+        { SYNC_ACTION_XFER, "/tgt/test/one/02.mp3" },
+        { SYNC_ACTION_XFER, "/tgt/test/one/nested/subfolder/04.mp3" },
+        { SYNC_ACTION_XFER, "/tgt/test/two/11.mp3" },
+        { SYNC_ACTION_XFER, "/tgt/test/two/12.mp3" },
+        { SYNC_ACTION_XFER, "/tgt/test/two/13.mp3" },
+        { SYNC_ACTION_XFER, "/tgt/three/21.mp3" },
     };
 
     List* plans = sync_plan_push(source_files, target_files, specs, 1);
@@ -51,13 +51,13 @@ static void assert_push_nocleanup(List* source_files, List* target_files, List* 
         { SYNC_ACTION_MKDIR, "/tgt/test/two" },
         { SYNC_ACTION_MKDIR, "/tgt/test/one/nested" },
         { SYNC_ACTION_MKDIR, "/tgt/test/one/nested/subfolder" },
-        { SYNC_ACTION_PUSH, "/tgt/test/one/01.mp3" },
-        { SYNC_ACTION_PUSH, "/tgt/test/one/02.mp3" },
-        { SYNC_ACTION_PUSH, "/tgt/test/one/nested/subfolder/04.mp3" },
-        { SYNC_ACTION_PUSH, "/tgt/test/two/11.mp3" },
-        { SYNC_ACTION_PUSH, "/tgt/test/two/12.mp3" },
-        { SYNC_ACTION_PUSH, "/tgt/test/two/13.mp3" },
-        { SYNC_ACTION_PUSH, "/tgt/three/21.mp3" },
+        { SYNC_ACTION_XFER, "/tgt/test/one/01.mp3" },
+        { SYNC_ACTION_XFER, "/tgt/test/one/02.mp3" },
+        { SYNC_ACTION_XFER, "/tgt/test/one/nested/subfolder/04.mp3" },
+        { SYNC_ACTION_XFER, "/tgt/test/two/11.mp3" },
+        { SYNC_ACTION_XFER, "/tgt/test/two/12.mp3" },
+        { SYNC_ACTION_XFER, "/tgt/test/two/13.mp3" },
+        { SYNC_ACTION_XFER, "/tgt/three/21.mp3" },
     };
 
     List* plans = sync_plan_push(source_files, target_files, specs, 0);

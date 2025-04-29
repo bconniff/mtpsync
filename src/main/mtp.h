@@ -11,8 +11,8 @@
 #include "sync.h"
 
 #define MTP_SKIP_MSG   C_BOLD C_YELLOW "SKIP" C_RESET ///< skipped message
-#define MTP_PULL_MSG   C_BOLD C_CYAN "PULL" C_RESET   ///< pull file message
-#define MTP_PUSH_MSG   C_BOLD C_GREEN "PUSH" C_RESET  ///< push file message
+#define MTP_PULL_MSG   C_BOLD C_CYAN "PULL" C_RESET   ///< pull file to local
+#define MTP_PUSH_MSG   C_BOLD C_GREEN "PUSH" C_RESET  ///< push file to device
 #define MTP_RM_MSG     C_BOLD C_RED "RM" C_RESET      ///< remove file message
 #define MTP_MKDIR_MSG  C_BOLD C_BLUE "MKDIR" C_RESET  ///< mkdir message
 
@@ -69,20 +69,20 @@ typedef MtpStatusCode (*MtpDeviceFn)(Device* dev, void* data);
 MtpStatusCode mtp_each_device(MtpDeviceFn callback, MtpDeviceParams* params, void* data);
 
 /**
- * Display progress for any operations that send files to or from the device.
- * @param sent   number of bytes sent/received
- * @param total  total number of bytes
- * @param data   pointer to MtpOperationData representing the operation
- */
-int mtp_progress(const uint64_t sent, const uint64_t total, void const * const data);
-
-/**
  * Send a local file to an MTP device.
  * @param dev   device to operate on
  * @param plan  plan for file to send
  * @return      status code
  */
 MtpStatusCode mtp_send_file(Device* dev, SyncPlan* plan);
+
+/**
+ * Retrieve a file from an MTP device to local system.
+ * @param dev   device to operate on
+ * @param plan  plan for file to get
+ * @return      status code
+ */
+MtpStatusCode mtp_get_file(Device* dev, SyncPlan* plan);
 
 /**
  * Delete a file or directory from an MTP device.
@@ -101,11 +101,19 @@ MtpStatusCode mtp_rm_file(Device* dev, SyncPlan* plan);
 MtpStatusCode mtp_mkdir(Device* dev, SyncPlan* plan);
 
 /**
- * Execute sync plan for a device.
+ * Execute plan to push files to a device.
  * @param dev   device to operate on
  * @param plan  list of plans to execute
  * @return      status code
  */
-MtpStatusCode mtp_execute_sync_plan(Device* dev, List* plan);
+MtpStatusCode mtp_execute_push_plan(Device* dev, List* plan);
+
+/**
+ * Execute plan to pull files from a device.
+ * @param dev   device to operate on
+ * @param plan  list of plans to execute
+ * @return      status code
+ */
+MtpStatusCode mtp_execute_pull_plan(Device* dev, List* plan);
 
 #endif

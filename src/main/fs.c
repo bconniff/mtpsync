@@ -1,13 +1,18 @@
-#include <stdlib.h>
-#include <libgen.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
+#define _XOPEN_SOURCE 500
+
 #include <dirent.h>
-#include <stdio.h>
-#include <string.h>
-#include <limits.h>
 #include <errno.h>
+#include <libgen.h>
+#include <limits.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <threads.h>
+#include <unistd.h>
+#include <ftw.h>
 
 #include "fs.h"
 #include "str.h"
@@ -15,6 +20,7 @@
 
 #define FS_FILE_BUF_SIZE 128
 #define FS_DIR_BUF_SIZE 32
+#define FS_OPEN_FILES 16
 
 enum FsPathState {
     FS_PATH_START,
@@ -24,85 +30,144 @@ enum FsPathState {
     FS_PATH_DOTDOT,
 };
 
-static FsStatusCode fs_collect_files_recursive(List* files, char *path);
+static thread_local List* files = NULL;
 
-static FsStatusCode fs_collect_files_recursive(List* files, char *path) {
-    FsStatusCode code = FS_STATUS_EFAIL;
-    List* children = NULL;
-    char* path_copy = NULL;
-    char* child_path = NULL;
-    DIR* dir = NULL;
+static inline int nftw_callback(const char* fpath, const struct stat* s, int tflag, struct FTW* ftwbuf) {
+    int e = ENOMEM;
+    char* fpath_r = NULL;
 
-    struct stat path_s;
-    if (lstat(path, &path_s) != 0) goto done;
+    if (!S_ISDIR(s->st_mode)) {
+        fpath_r = fs_resolve(fpath);
+        if (!fpath_r) goto done;
 
-    if (!S_ISDIR(path_s.st_mode)) {
-        path_copy = strdup(path);
-        if (!path_copy) goto done;
-
-        if (list_push(files, path_copy) != LIST_STATUS_OK) goto done;
-        path_copy = NULL;
-        code = FS_STATUS_OK;
-        goto done;
+        if (list_push(files, fpath_r) != LIST_STATUS_OK) goto done;
+        fpath_r = NULL;
     }
 
-    children = list_new(FS_DIR_BUF_SIZE);
-    if (!children) goto done;
-
-    dir = opendir(path);
-    if (!dir) goto done;
-
-    struct dirent* entry;
-    while ((entry = readdir(dir)) != NULL) {
-        char* name = entry->d_name;
-        char* child_path = NULL;
-
-        if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) {
-            continue;
-        }
-
-        child_path = fs_path_join(path, name);
-        if (!child_path) goto done;
-
-        if (list_push(children, child_path) != LIST_STATUS_OK) goto done;
-
-        child_path = NULL;
-    }
-
-    closedir(dir);
-    dir = NULL;
-
-    for (size_t i = 0; i < list_size(children); i++) {
-        char* child_path = list_get(children, i);
-        fs_collect_files_recursive(files, child_path);
-    }
-
-    code = FS_STATUS_OK;
+    e = 0;
 
 done:
-    if (dir) closedir(dir);
-    free(path_copy);
-    free(child_path);
-    list_free_deep(children, free);
-    return code;
+    free(fpath_r);
+    return e;
+}
+
+static FsStatusCode handle_ancestor(List* parents, char* path) {
+    FsStatusCode status = FS_STATUS_EFAIL;
+    char* path_dup = NULL;
+
+    struct stat s;
+    int lstat_code = lstat(path, &s);
+
+    if (lstat_code == 0) {
+        path_dup = strdup(path);
+        if (!path_dup) goto error;
+        if (list_push(parents, path_dup) != LIST_STATUS_OK) goto error;
+        path_dup = NULL;
+        status = FS_STATUS_OK;
+    } else if (errno == ENOENT) {
+        status = FS_STATUS_ENOENT;
+    }
+
+error:
+    free(path_dup);
+    return status;
+}
+
+List* fs_collect_ancestors(char* path) {
+    List* ancestors = NULL;
+    char* root_dup = NULL;
+    char* path_r = NULL;
+
+    path_r = fs_resolve(path);
+    if (!path_r) goto error;
+
+    ancestors = list_new(FS_DIR_BUF_SIZE);
+    if (!ancestors) goto error;
+
+    root_dup = strdup("/");
+    if (!root_dup) goto error;
+
+    if (list_push(ancestors, root_dup) != LIST_STATUS_OK) goto error;
+    root_dup = NULL;
+
+    for (char* p = path_r+1; *p; p++) {
+        if (*p == '/') {
+            *p = 0;
+            FsStatusCode code = handle_ancestor(ancestors, path_r);
+            *p = '/';
+
+            if (code == FS_STATUS_ENOENT) goto done;
+            if (code != FS_STATUS_OK) goto error;
+        }
+    }
+
+    FsStatusCode code = handle_ancestor(ancestors, path_r);
+    if (code == FS_STATUS_ENOENT || code == FS_STATUS_OK) goto done;
+
+error:
+    list_free_deep(ancestors, free);
+    ancestors = NULL;
+
+done:
+    free(root_dup);
+    free(path_r);
+    return ancestors;
+
 }
 
 List* fs_collect_files(char *path) {
-    List* files = NULL;
+    int e = ENOMEM;
+    char* path_r = NULL;
+    files = NULL;
+
+    struct stat s;
+    int lstat_code = lstat(path, &s);
+    if (lstat_code != 0) {
+        e = errno; // save the errno from lstat
+        goto error;
+    }
 
     files = list_new(FS_FILE_BUF_SIZE);
     if (!files) goto error;
 
-    if (fs_collect_files_recursive(files, path) != FS_STATUS_OK) goto error;
+    if (S_ISDIR(s.st_mode)) {
+        int nftw_code = nftw(path, nftw_callback, FS_OPEN_FILES, 0);
+        if (nftw_code != 0) {
+            e = nftw_code;
+            goto error;
+        }
+    } else {
+        char* path_r = fs_resolve(path);
+        if (!path_r) goto error;
+        if (list_push(files, path_r) != LIST_STATUS_OK) goto error;
+        path_r = NULL;
+    }
 
     return files;
 
 error:
+    free(path_r);
     list_free_deep(files, free);
+    errno = e;
     return NULL;
 }
 
-static FsStatusCode fs_mkdir_try(char* path) {
+FsStatusCode fs_rm(char* path) {
+    struct stat s;
+    int lstat_code = lstat(path, &s);
+
+    if (lstat_code != 0) return FS_STATUS_EFAIL;
+
+    if (S_ISDIR(s.st_mode)) {
+        if (rmdir(path) != 0) return FS_STATUS_EFAIL;
+    } else {
+        if (unlink(path) != 0) return FS_STATUS_EFAIL;
+    }
+
+    return FS_STATUS_OK;
+}
+
+FsStatusCode fs_mkdir(char* path) {
     struct stat s;
     int lstat_code = lstat(path, &s);
 
@@ -137,12 +202,12 @@ FsStatusCode fs_mkdirp(char* path) {
     for (char* p = tmp+1; *p; p++) {
         if (*p == '/') {
             *p = 0;
-            if (fs_mkdir_try(tmp) != FS_STATUS_OK) goto done;
+            if (fs_mkdir(tmp) != FS_STATUS_OK) goto done;
             *p = '/';
         }
     }
 
-    if (fs_mkdir_try(tmp) != FS_STATUS_OK) goto done;
+    if (fs_mkdir(tmp) != FS_STATUS_OK) goto done;
 
     result = FS_STATUS_OK;
 
@@ -151,7 +216,7 @@ done:
     return result;
 }
 
-size_t fs_path_append(char* result, size_t len, char* path) {
+size_t fs_path_append(char* result, const size_t len, const char* path) {
     size_t i = 0;
     size_t j = len;
     enum FsPathState state = FS_PATH_START;
@@ -224,7 +289,7 @@ size_t fs_path_append(char* result, size_t len, char* path) {
     return j;
 }
 
-char* fs_resolve_cwd(char* cwd, char* path) {
+char* fs_resolve_cwd(const char* cwd, const char* path) {
     char* result = NULL;
     size_t path_len = path ? strlen(path) : 1;
     size_t j = 0;
@@ -253,7 +318,7 @@ error:
     return NULL;
 }
 
-char* fs_resolve(char* path) {
+char* fs_resolve(const char* path) {
     char* result = NULL;
     char* cwd = NULL;
 
@@ -274,7 +339,7 @@ error:
     return NULL;
 }
 
-char* fs_path_join(char* head, char* tail) {
+char* fs_path_join(const char* head, const char* tail) {
     int j = 0;
     size_t head_len = head ? strlen(head) : 0;
     size_t tail_len = tail ? strlen(tail) : 0;

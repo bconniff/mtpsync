@@ -63,7 +63,7 @@ static MtpStatusCode pull_impl(int argc, char **argv, MtpArgs* args) {
     char* to_path = argc < 4 ? NULL : argv[3];
 
     MtpDeviceParams params = as_params(args);
-    return mtp_pull(&params, from_path, to_path);
+    return mtp_pull(&params, from_path, to_path, args->cleanup);
 }
 
 static MtpStatusCode push_impl(int argc, char** argv, MtpArgs* args) {

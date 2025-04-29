@@ -15,20 +15,42 @@ typedef enum {
     FS_STATUS_OK,      ///< Operation successful
     FS_STATUS_ENOMEM,  ///< Failed due to allocation error
     FS_STATUS_EFAIL,   ///< Failed due to other unspecified runtime issue
+    FS_STATUS_ENOENT,  ///< Failed because file does not exist
 } FsStatusCode;
 
 /**
- * Recursively collect all files within a specified path and into a list.
+ * Collect all regular files within a specified path into a list.
  * @param path  to collect files from
  * @return      list of all files under the provided path
  */
 List* fs_collect_files(char* path);
 
 /**
+ * Collect all existing parent directories for a given path into a list.
+ * @param path  to collect ancestors of
+ * @return      list of all ancestor directories
+ */
+List* fs_collect_ancestors(char* path);
+
+/**
+ * Remove a file or directory
+ * @param path  path to remove
+ * @return      status of operation
+ */
+FsStatusCode fs_rm(char* path);
+
+/**
+ * Create directory path if it dose not exist.
+ * @param path  directory path to create
+ * @return      status of operation
+ */
+FsStatusCode fs_mkdir(char* path);
+
+/**
  * Create directory path, including all non-existing parent directories.
  * Does not fail if the directory already exists.
  * @param path  directory path to create
- * @return      status of operation.
+ * @return      status of operation
  */
 FsStatusCode fs_mkdirp(char* path);
 
@@ -43,7 +65,7 @@ FsStatusCode fs_mkdirp(char* path);
  * @param path  to resolve
  * @return      resolved path or NULL if an error
  */
-char* fs_resolve(char* path);
+char* fs_resolve(const char* path);
 
 /**
  * Resolve a path relative to a specific directory. This works the same
@@ -54,7 +76,7 @@ char* fs_resolve(char* path);
  * @param path  to resolve
  * @return      resolved path or NULL if an error
  */
-char* fs_resolve_cwd(char* cwd, char* path);
+char* fs_resolve_cwd(const char* cwd, const char* path);
 
 /**
  * Joins two paths and does the following to normalize the result:
@@ -67,7 +89,7 @@ char* fs_resolve_cwd(char* cwd, char* path);
  * @param b  second path
  * @return   joined result or NULL if an error
  */
-char* fs_path_join(char* a, char* b);
+char* fs_path_join(const char* a, const char* b);
 
 /**
  * Determines the basename of the provided path. Does not mutate the original

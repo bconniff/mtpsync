@@ -216,7 +216,7 @@ static inline SyncStatusCode ancestor_cb(SyncFile* target, int is_ancestor, void
 
     SyncAncestorData* d = data;
     SyncFile* source = is_ancestor ? NULL : d->source;
-    SyncAction action = target->is_folder ? SYNC_ACTION_MKDIR : SYNC_ACTION_PUSH;
+    SyncAction action = target->is_folder ? SYNC_ACTION_MKDIR : SYNC_ACTION_XFER;
 
     plan = sync_plan_new(source, target, action);
     if (!plan) goto error;
@@ -364,19 +364,58 @@ done:
     return plans_sorted;
 }
 
-void sync_plan_print(List* plans) {
+void sync_plan_print(List* plans, char* xfer_msg) {
     for (size_t i = 0; i < list_size(plans); i++) {
         SyncPlan* plan = list_get(plans, i);
         switch (plan->action) {
             case SYNC_ACTION_MKDIR:
                 printf("%s: %s/\n", MTP_MKDIR_MSG, plan->target->path);
                 break;
-            case SYNC_ACTION_PUSH:
-                printf("%s: %s\n", MTP_PUSH_MSG, plan->target->path);
+            case SYNC_ACTION_XFER:
+                printf("%s: %s\n", xfer_msg, plan->target->path);
                 break;
             case SYNC_ACTION_RM:
                 printf("%s: %s%s\n", MTP_RM_MSG, plan->target->path, plan->target->is_folder ? "/" : "");
                 break;
         }
     }
+}
+
+List* sync_spec_create(List* files, char* from_path, char* to_path) {
+    List* specs = NULL;
+    SyncSpec* spec = NULL;
+    char* target = NULL;
+
+    specs = list_new(list_size(files));
+    if (!specs) goto error;
+
+    size_t from_path_len = strlen(from_path);
+    for (size_t i = 0; i < list_size(files); i++) {
+        SyncFile* f = list_get(files, i);
+        if (f->is_folder) continue;
+
+        target = fs_path_join(to_path, f->path + from_path_len);
+        if (!target) goto error;
+
+        spec = sync_spec_new(f->path, target);
+        if (!spec) goto error;
+
+        if (list_push(specs, spec) != LIST_STATUS_OK) goto error;
+
+        free(target);
+
+        spec = NULL;
+        target = NULL;
+    }
+
+    goto done;
+
+error:
+    list_free_deep(specs, (ListItemFreeFn)sync_spec_free);
+    specs = NULL;
+
+done:
+    free(target);
+    sync_spec_free(spec);
+    return specs;
 }

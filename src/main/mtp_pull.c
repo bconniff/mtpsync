@@ -11,106 +11,66 @@
 #include "str.h"
 #include "fs.h"
 #include "io.h"
+#include "map.h"
 
 typedef struct {
+    int cleanup;
     char* from_path;
     char* to_path;
 } MtpPullParams;
 
-static MtpStatusCode mtp_pull_files(Device* dev, List* pull_files_pre, MtpPullParams* params) {
-    MtpStatusCode code = MTP_STATUS_EFAIL;
-    List* pull_files = NULL;
-    char* to_path = NULL;
-    char* to_dir = NULL;
+static List* collect_local_files(char* path) {
+    List* child_files = NULL;
+    List* parent_dirs = NULL;
+    List* local_files = NULL;
+    SyncFile* file = NULL;
 
-    pull_files = list_new(list_size(pull_files_pre));
-    if (!pull_files) goto done;
+    child_files = fs_collect_files(path);
+    if (!child_files && errno == ENOENT) child_files = list_new(0);
+    if (!child_files) goto error;
 
-    size_t from_path_len = strcmp(params->from_path, "/") == 0 ? 0 : strlen(params->from_path);
-    for (size_t i = 0; i < list_size(pull_files_pre); i++) {
-        DeviceFile* f = list_get(pull_files_pre, i);
+    parent_dirs = fs_collect_ancestors(path);
+    if (!parent_dirs) goto error;
 
-        to_path = fs_path_join(params->to_path, f->path+from_path_len);
-        if (!to_path) goto done;
+    local_files = list_new(list_size(child_files) + list_size(parent_dirs));
+    if (!local_files) goto error;
 
-        struct stat s;
-        int stat_code = lstat(to_path, &s);
-
-        if (stat_code == 0) {
-            printf("%s: %s\n", MTP_SKIP_MSG, to_path);
-        } else if (errno == ENOENT) {
-            if (list_push(pull_files, f) != LIST_STATUS_OK) goto done;
-            printf("%s: %s\n", MTP_PULL_MSG, to_path);
-        } else {
-            perror("lstat() failed in mtp_pull_files()");
-            goto done;
-        }
-
-        free(to_path);
-        to_path = NULL;
+    for (size_t i = 0; i < list_size(parent_dirs); i++) {
+        file = sync_file_new(list_get(parent_dirs, i), 1);
+        if (!file) goto error;
+        if (list_push(local_files, file) != LIST_STATUS_OK) goto error;
+        file = NULL;
     }
 
-    if (!list_size(pull_files)) {
-        printf("All files already present on the local system.\n");
-        code = MTP_STATUS_OK;
-        goto done;
+    for (size_t i = 0; i < list_size(child_files); i++) {
+        file = sync_file_new(list_get(child_files, i), 0);
+        if (!file) goto error;
+        if (list_push(local_files, file) != LIST_STATUS_OK) goto error;
+        file = NULL;
     }
 
-    if (!io_confirm("Proceed [y/n]? ")) {
-        code = MTP_STATUS_EREJECT;
-        goto done;
-    }
+    goto done;
 
-    for (size_t i = 0; i < list_size(pull_files); i++) {
-        DeviceFile* f = list_get(pull_files, i);
-
-        to_path = fs_path_join(params->to_path, f->path+from_path_len);
-        if (!to_path) goto done;
-
-        to_dir = fs_dirname(to_path);
-        if (!to_dir) goto done;
-
-        if (fs_mkdirp(to_dir) != FS_STATUS_OK) {
-            fprintf(stderr, "fs_mkdirp(%s) failed in mtp_pull_files(): ", to_dir);
-            perror(NULL);
-            goto done;
-        }
-
-        MtpOperationData op = { .name = MTP_PULL_MSG, .file = to_path };
-        if (LIBMTP_Get_File_To_File(dev->device, f->id, to_path, mtp_progress, &op) != 0) {
-            fprintf(stdout, "\n");
-            fprintf(stderr, "Error getting file from MTP device.\n");
-            LIBMTP_Dump_Errorstack(dev->device);
-            LIBMTP_Clear_Errorstack(dev->device);
-            goto done;
-        }
-        printf("\n");
-
-        free(to_path);
-        free(to_dir);
-
-        to_path = NULL;
-        to_dir = NULL;
-    }
-
-    code = MTP_STATUS_OK;
+error:
+    list_free_deep(local_files, (ListItemFreeFn)sync_file_free);
+    local_files = NULL;
 
 done:
-    free(to_path);
-    free(to_dir);
-    list_free(pull_files);
-    return code;
-}
-
-static int exclude_folders(void* item) {
-    DeviceFile* file = item;
-    return !file->is_folder;
+    free(file);
+    list_free_deep(child_files, free);
+    list_free_deep(parent_dirs, free);
+    return local_files;
 }
 
 static MtpStatusCode mtp_pull_callback(Device* dev, void* data) {
-    int code = MTP_STATUS_EFAIL;
-    List* pull_files = NULL;
-    List* pull_files_only = NULL;
+    MtpStatusCode code = MTP_STATUS_EFAIL;
+    List* device_files = NULL;
+    List* local_files = NULL;
+    List* pull_specs = NULL;
+    List* source_files = NULL;
+    List* plans = NULL;
+
+    MtpPullParams* params = (MtpPullParams*)data;
 
     if (device_load(dev) != DEVICE_STATUS_OK) {
         code = MTP_STATUS_EDEVICE;
@@ -118,65 +78,85 @@ static MtpStatusCode mtp_pull_callback(Device* dev, void* data) {
         goto done;
     }
 
-    MtpPullParams* params = (MtpPullParams*)data;
+    device_files = device_filter_files(dev, params->from_path);
+    if (!device_files) goto done;
 
-    pull_files = device_filter_files(dev, params->from_path);
-    if (!pull_files) goto done;
+    MapStatusCode map_status = MAP_STATUS_OK;
+    source_files = list_map_data(device_files, (ListMapDataFn)map_device_file_to_sync_file, &map_status);
+    if (!source_files || (map_status != MAP_STATUS_OK)) goto done;
 
-    pull_files_only = list_filter(pull_files, exclude_folders);
-    if (!pull_files_only) goto done;
+    local_files = collect_local_files(params->to_path);
+    if (!local_files) goto done;
 
-    if (!list_size(pull_files_only)) {
-        fprintf(stderr, "No matching files on device: %s\n", params->from_path);
-        goto done;
+    pull_specs = sync_spec_create(source_files, params->from_path, params->to_path);
+    if (!pull_specs) goto done;
+
+    plans = sync_plan_push(source_files, local_files, pull_specs, params->cleanup);
+    if (!plans) goto done;
+
+    sync_plan_print(plans, MTP_PULL_MSG);
+
+    if (list_size(plans)) {
+        if (!io_confirm("Proceed [y/n]? ")) {
+            code = MTP_STATUS_EREJECT;
+            goto done;
+        }
+        if (mtp_execute_pull_plan(dev, plans) != MTP_STATUS_OK) goto done;
+    } else {
+        printf("All files already present on the local system.\n");
     }
 
-    code = mtp_pull_files(dev, pull_files_only, params);
+    code = MTP_STATUS_OK;
 
 done:
-    list_free(pull_files_only);
-    list_free(pull_files);
+    list_free(device_files);
+    list_free_deep(local_files, free);
+    list_free_deep(source_files, (ListItemFreeFn)sync_file_free);
+    list_free_deep(plans, (ListItemFreeFn)sync_plan_free);
+    list_free_deep(pull_specs, (ListItemFreeFn)sync_spec_free);
     return code;
 }
 
-MtpStatusCode mtp_pull(MtpDeviceParams* mtp_params, char* from_path, char* to_path) {
+MtpStatusCode mtp_pull(MtpDeviceParams* mtp_params, char* from_path, char* to_path, int cleanup) {
     MtpStatusCode code = MTP_STATUS_EFAIL;
-    char* from_path_basename = NULL;
+    char* from_path_bname = NULL;
     char* to_path_tmp = NULL;
+    char* from_path_r = NULL;
+    char* to_path_r = NULL;
 
-    MtpPullParams pull_params = {
-        .from_path = NULL,
-        .to_path = NULL
-    };
-
-    pull_params.from_path = fs_resolve_cwd("/", from_path);
-    if (!pull_params.from_path) goto done;
+    from_path_r = fs_resolve_cwd("/", from_path);
+    if (!from_path_r) goto done;
 
     if (to_path) {
-        pull_params.to_path = fs_resolve(to_path);
-        if (!pull_params.to_path) goto done;
+        to_path_r = fs_resolve(to_path);
+        if (!to_path_r) goto done;
     } else {
-        if (strcmp("/", pull_params.from_path) == 0) {
+        if (strcmp("/", from_path_r) == 0) {
             fprintf(stderr, "Destination required when pulling device's root folder\n");
             goto done;
         }
 
-        from_path_basename = fs_basename(pull_params.from_path);
-        if (!from_path_basename) goto done;
+        from_path_bname = fs_basename(from_path_r);
+        if (!from_path_bname) goto done;
 
-        to_path_tmp = str_join(2, "./", from_path_basename);
+        to_path_tmp = str_join(2, "./", from_path_bname);
         if (!to_path_tmp) goto done;
 
-        pull_params.to_path = fs_resolve(to_path_tmp);
-        if (!pull_params.to_path) goto done;
+        to_path_r = fs_resolve(to_path_tmp);
+        if (!to_path_r) goto done;
     }
 
+    MtpPullParams pull_params = {
+        .from_path = from_path_r,
+        .to_path = to_path_r,
+        .cleanup = cleanup,
+    };
     code = mtp_each_device(mtp_pull_callback, mtp_params, &pull_params);
 
 done:
-    free(pull_params.from_path);
-    free(pull_params.to_path);
-    free(from_path_basename);
+    free(from_path_r);
+    free(to_path_r);
+    free(from_path_bname);
     free(to_path_tmp);
     return code;
 };
