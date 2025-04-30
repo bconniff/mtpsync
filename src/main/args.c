@@ -32,36 +32,38 @@ ArgParseResult arg_parse(int argc, char** argv, size_t defc, ArgDefinition defv[
                 break;
             }
 
-            for (size_t j = 0; j < defc; j++) {
+            int found = 0;
+            for (size_t j = 0; !found && j < defc; j++) {
                 ArgDefinition a = defv[j];
                 if (strcmp(a.arg_long, arg+2) == 0) {
                     if (a.arg_fn(argc, argv, &i, data) != ARG_STATUS_OK) goto error;
-                    goto next;
+                    found = 1;
                 }
             }
+            if (found) continue;
             fprintf(stderr, "Invalid argument: %s\n", arg);
             goto error;
         }
 
         // short option
         if (strncmp("-", arg, 1) == 0) {
+            int found = 0;
             if (strlen(arg) == 2) {
-                for (size_t j = 0; j < defc; j++) {
+                for (size_t j = 0; !found && j < defc; j++) {
                     ArgDefinition a = defv[j];
                     if (a.arg_short == arg[1]) {
                         if (a.arg_fn(argc, argv, &i, data) != ARG_STATUS_OK) goto error;
-                        goto next;
+                        found = 1;
                     }
                 }
             }
+            if (found) continue;
             fprintf(stderr, "Invalid argument: %s\n", arg);
             goto error;
         }
 
         // positional argument
         result.argv[new_argc++] = arg;
-
-    next:
     }
 
     while (i < argc) result.argv[new_argc++] = argv[i++];

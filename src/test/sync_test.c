@@ -170,8 +170,44 @@ static int sync_rm_test() {
     return 0;
 }
 
+int sync_spec_test() {
+    char* files[] = {
+        "/src/path/to/one",
+        "/src/path/to/two",
+    };
+
+    char* expected_targets[] = {
+        "/target/to/one",
+        "/target/to/two",
+    };
+
+    List* l = list_new(ARRAY_LEN(files));
+    assert(l);
+
+    for (size_t i = 0; i < ARRAY_LEN(files); i++) {
+        File* f = file_new(files[i], 0);
+        assert(f);
+        assert(list_push(l, f) == LIST_STATUS_OK);
+    }
+
+    List* specs = sync_spec_create(l, "/src/path", "/target");
+    assert(specs);
+    assert(list_size(specs) == ARRAY_LEN(files));
+    for (size_t i = 0; i < ARRAY_LEN(files); i++) {
+        SyncSpec* spec = list_get(specs, i);
+        assert(spec);
+        assert(strcmp(files[i], spec->source) == 0);
+        assert(strcmp(expected_targets[i], spec->target) == 0);
+    }
+
+    list_free_deep(l, (ListItemFreeFn)file_free);
+    list_free_deep(specs, (ListItemFreeFn)sync_spec_free);
+    return 0;
+}
+
 int sync_test() {
     sync_push_test();
     sync_rm_test();
+    sync_spec_test();
     return 0;
 }

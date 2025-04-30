@@ -3,6 +3,7 @@
 #include "test/fs_test.h"
 #include "test/str_test.h"
 #include "test/sync_test.h"
+#include "test/args_test.h"
 
 int main(int argc, char **argv) {
     hash_test(1);
@@ -12,4 +13,5 @@ int main(int argc, char **argv) {
     fs_test();
     str_test();
     sync_test();
+    args_test();
 }
