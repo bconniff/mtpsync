@@ -49,6 +49,7 @@ static inline int sync_plan_cmp(const void* a, const void* b) {
                 break;
 
             default:
+                break;
         }
     }
 
