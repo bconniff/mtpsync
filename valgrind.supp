@@ -1,0 +1,12 @@
+{
+    libmtp_detect_raw_devices
+    Memcheck:Leak
+    ...
+    fun:LIBMTP_Detect_Raw_Devices
+}
+{
+    libmtp_open_raw_device_uncached
+    Memcheck:Leak
+    ...
+    fun:LIBMTP_Open_Raw_Device_Uncached
+}

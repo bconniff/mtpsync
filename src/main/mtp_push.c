@@ -19,7 +19,6 @@
 #include "hash.h"
 #include "sync.h"
 #include "array.h"
-#include "map.h"
 
 #define MTP_PUSH_LIST_INIT_SIZE 512
 
@@ -33,7 +32,6 @@ typedef struct {
 static MtpStatusCode mtp_push_callback(Device* dev, void* data) {
     MtpStatusCode code = MTP_STATUS_EFAIL;
     List* plans = NULL;
-    List* device_files = NULL;
     List* target_files = NULL;
 
     if (device_load(dev) != DEVICE_STATUS_OK) {
@@ -44,12 +42,8 @@ static MtpStatusCode mtp_push_callback(Device* dev, void* data) {
 
     MtpPushParams* params = (MtpPushParams*)data;
 
-    device_files = device_filter_files(dev, params->to_path);
-    if (!device_files) goto done;
-
-    MapStatusCode map_status = MAP_STATUS_OK;
-    target_files = list_map_data(device_files, (ListMapDataFn)map_device_file_to_sync_file, &map_status);
-    if (!target_files || (map_status != MAP_STATUS_OK)) goto done;
+    target_files = device_filter_files(dev, params->to_path);
+    if (!target_files) goto done;
 
     plans = sync_plan_push(params->source_files, target_files, params->push_specs, params->cleanup);
     if (!plans) goto done;
@@ -69,8 +63,7 @@ static MtpStatusCode mtp_push_callback(Device* dev, void* data) {
     code = MTP_STATUS_OK;
 
 done:
-    list_free(device_files);
-    list_free_deep(target_files, (ListItemFreeFn)sync_file_free);
+    list_free(target_files);
     list_free_deep(plans, (ListItemFreeFn)sync_plan_free);
     return code;
 }
@@ -79,7 +72,6 @@ MtpStatusCode mtp_push(MtpDeviceParams* mtp_params, char* from_path, char* to_pa
     MtpStatusCode code = MTP_STATUS_EFAIL;
     List* source_files = NULL;
     List* push_specs = NULL;
-    List* local_files = NULL;
     char* from_path_r = NULL;
     char* to_path_r = NULL;
 
@@ -89,17 +81,13 @@ MtpStatusCode mtp_push(MtpDeviceParams* mtp_params, char* from_path, char* to_pa
     to_path_r = fs_resolve_cwd("/", to_path);
     if (!to_path_r) goto done;
 
-    local_files = fs_collect_files(from_path_r);
-    if (!local_files) goto done;
+    source_files = fs_collect_files(from_path_r);
+    if (!source_files) goto done;
 
-    if (!list_size(local_files)) {
+    if (!list_size(source_files)) {
         printf("No files in local path: %s\n", from_path_r);
         goto done;
     }
-
-    MapStatusCode map_status = MAP_STATUS_OK;
-    source_files = list_map_data(local_files, (ListMapDataFn)map_path_to_sync_file, &map_status);
-    if (!source_files || (map_status != MAP_STATUS_OK)) goto done;
 
     push_specs = sync_spec_create(source_files, from_path_r, to_path_r);
     if (!push_specs) goto done;
@@ -115,8 +103,7 @@ MtpStatusCode mtp_push(MtpDeviceParams* mtp_params, char* from_path, char* to_pa
 done:
     free(from_path_r);
     free(to_path_r);
-    list_free_deep(local_files, free);
-    list_free_deep(source_files, (ListItemFreeFn)sync_file_free);
+    list_free_deep(source_files, (ListItemFreeFn)file_free);
     list_free_deep(push_specs, (ListItemFreeFn)sync_spec_free);
     return code;
 }

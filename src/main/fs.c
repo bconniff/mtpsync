@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <ftw.h>
 
+#include "file.h"
 #include "fs.h"
 #include "str.h"
 #include "list.h"
@@ -30,52 +31,54 @@ enum FsPathState {
     FS_PATH_DOTDOT,
 };
 
-static thread_local List* files = NULL;
+// used to collect file listing with nftw and nftw_callback
+static thread_local List* g_files = NULL;
 
 static inline int nftw_callback(const char* fpath, const struct stat* s, int tflag, struct FTW* ftwbuf) {
     int e = ENOMEM;
-    char* fpath_r = NULL;
+    File* file = NULL;
+    int is_folder = S_ISDIR(s->st_mode);
 
-    if (!S_ISDIR(s->st_mode)) {
-        fpath_r = fs_resolve(fpath);
-        if (!fpath_r) goto done;
+    if (!is_folder) {
+        file = file_new(fpath, is_folder);
+        if (!file) goto done;
 
-        if (list_push(files, fpath_r) != LIST_STATUS_OK) goto done;
-        fpath_r = NULL;
+        if (list_push(g_files, file) != LIST_STATUS_OK) goto done;
+        file = NULL;
     }
 
     e = 0;
 
 done:
-    free(fpath_r);
+    file_free(file);
     return e;
 }
 
-static FsStatusCode handle_ancestor(List* parents, char* path) {
+static FsStatusCode handle_ancestor(List* ancestors, char* path) {
     FsStatusCode status = FS_STATUS_EFAIL;
-    char* path_dup = NULL;
+    File* file = NULL;
 
     struct stat s;
     int lstat_code = lstat(path, &s);
 
     if (lstat_code == 0) {
-        path_dup = strdup(path);
-        if (!path_dup) goto error;
-        if (list_push(parents, path_dup) != LIST_STATUS_OK) goto error;
-        path_dup = NULL;
+        file = file_new(path, S_ISDIR(s.st_mode));
+        if (!file) goto error;
+        if (list_push(ancestors, file) != LIST_STATUS_OK) goto error;
+        file = NULL;
         status = FS_STATUS_OK;
     } else if (errno == ENOENT) {
         status = FS_STATUS_ENOENT;
     }
 
 error:
-    free(path_dup);
+    file_free(file);
     return status;
 }
 
 List* fs_collect_ancestors(char* path) {
     List* ancestors = NULL;
-    char* root_dup = NULL;
+    File* root = NULL;
     char* path_r = NULL;
 
     path_r = fs_resolve(path);
@@ -84,11 +87,11 @@ List* fs_collect_ancestors(char* path) {
     ancestors = list_new(FS_DIR_BUF_SIZE);
     if (!ancestors) goto error;
 
-    root_dup = strdup("/");
-    if (!root_dup) goto error;
+    root = file_new("/", 1);
+    if (!root) goto error;
 
-    if (list_push(ancestors, root_dup) != LIST_STATUS_OK) goto error;
-    root_dup = NULL;
+    if (list_push(ancestors, root) != LIST_STATUS_OK) goto error;
+    root = NULL;
 
     for (char* p = path_r+1; *p; p++) {
         if (*p == '/') {
@@ -109,7 +112,7 @@ error:
     ancestors = NULL;
 
 done:
-    free(root_dup);
+    file_free(root);
     free(path_r);
     return ancestors;
 
@@ -117,8 +120,8 @@ done:
 
 List* fs_collect_files(char *path) {
     int e = ENOMEM;
-    char* path_r = NULL;
-    files = NULL;
+    File* file = NULL;
+    g_files = NULL;
 
     struct stat s;
     int lstat_code = lstat(path, &s);
@@ -127,8 +130,8 @@ List* fs_collect_files(char *path) {
         goto error;
     }
 
-    files = list_new(FS_FILE_BUF_SIZE);
-    if (!files) goto error;
+    g_files = list_new(FS_FILE_BUF_SIZE);
+    if (!g_files) goto error;
 
     if (S_ISDIR(s.st_mode)) {
         int nftw_code = nftw(path, nftw_callback, FS_OPEN_FILES, 0);
@@ -137,17 +140,18 @@ List* fs_collect_files(char *path) {
             goto error;
         }
     } else {
-        char* path_r = fs_resolve(path);
-        if (!path_r) goto error;
-        if (list_push(files, path_r) != LIST_STATUS_OK) goto error;
-        path_r = NULL;
+        file = file_new(path, 0);
+        if (!file) goto error;
+
+        if (list_push(g_files, file) != LIST_STATUS_OK) goto error;
+        file = NULL;
     }
 
-    return files;
+    return g_files;
 
 error:
-    free(path_r);
-    list_free_deep(files, free);
+    file_free(file);
+    list_free_deep(g_files, (ListItemFreeFn)file_free);
     errno = e;
     return NULL;
 }

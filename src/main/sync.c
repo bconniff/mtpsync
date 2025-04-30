@@ -5,6 +5,7 @@
 
 #include "sync.h"
 #include "str.h"
+#include "file.h"
 #include "list.h"
 #include "hash.h"
 #include "fs.h"
@@ -17,21 +18,10 @@ typedef enum {
 
 typedef struct {
     List* plans;
-    SyncFile* source;
+    File* source;
 } SyncAncestorData;
 
-typedef SyncStatusCode (*SyncAncestorFn)(SyncFile* target, int is_ancestor, void* data);
-
-static inline size_t sync_file_hc(void* item) {
-    SyncFile* sf = item;
-    return hash_code_str(sf->path);
-}
-
-static inline int sync_file_cmp(void* a, void* b) {
-    SyncFile* aa = a;
-    SyncFile* bb = b;
-    return hash_cmp_str(aa->path, bb->path);
-}
+typedef SyncStatusCode (*SyncAncestorFn)(File* target, int is_ancestor, void* data);
 
 static inline int sync_plan_cmp(const void* a, const void* b) {
     const SyncPlan* aa = *(const SyncPlan**)a;
@@ -68,61 +58,26 @@ static inline int sync_plan_cmp(const void* a, const void* b) {
     return cmp;
 }
 
-void sync_file_free(SyncFile* f) {
-    if (f) {
-        free(f->path);
-        free(f);
-    }
-}
-
-void sync_file_hash_entry_free(HashEntry* e) {
-    sync_file_free(hash_entry_value(e));
-    hash_entry_free(e);
-}
-
-SyncFile* sync_file_new(char* path, int is_folder) {
-    char* path_dup = NULL;
-    SyncFile* file = NULL;
-
-    path_dup = strdup(path);
-    if (!path_dup) goto error;
-
-    file = malloc(sizeof(SyncFile));
-    if (!file) goto error;
-    file->path = path_dup;
-    file->is_folder = is_folder;
-    return file;
-
-error:
-    free(path_dup);
-    free(file);
-    return NULL;
-}
-
-SyncFile* sync_file_dup(SyncFile* f) {
-    return f ? sync_file_new(f->path, f->is_folder) : NULL;
-}
-
 void sync_plan_free(SyncPlan* plan) {
     if (plan) {
-        sync_file_free(plan->source);
-        sync_file_free(plan->target);
+        file_free(plan->source);
+        file_free(plan->target);
         free(plan);
     }
 }
 
-SyncPlan* sync_plan_new(SyncFile* source, SyncFile* target, SyncAction action) {
+SyncPlan* sync_plan_new(File* source, File* target, SyncAction action) {
     SyncPlan* plan = NULL;
-    SyncFile* source_dup = NULL;
-    SyncFile* target_dup = NULL;
+    File* source_dup = NULL;
+    File* target_dup = NULL;
 
     if (source) {
-        source_dup = sync_file_dup(source);
+        source_dup = file_dup(source);
         if (!source_dup) goto error;
     }
 
     if (target) {
-        target_dup = sync_file_dup(target);
+        target_dup = file_dup(target);
         if (!target_dup) goto error;
     }
 
@@ -134,8 +89,8 @@ SyncPlan* sync_plan_new(SyncFile* source, SyncFile* target, SyncAction action) {
     return plan;
 
 error:
-    sync_file_free(source_dup);
-    sync_file_free(target_dup);
+    file_free(source_dup);
+    file_free(target_dup);
     free(plan);
     return NULL;
 }
@@ -172,9 +127,9 @@ error:
     return NULL;
 }
 
-static SyncStatusCode put_ancestors(Hash* hash, SyncFile* f, SyncAncestorFn fn, void* data) {
+static SyncStatusCode put_ancestors(Hash* hash, File* f, SyncAncestorFn fn, void* data) {
     int code = SYNC_STATUS_EFAIL;
-    SyncFile* target = NULL;
+    File* target = NULL;
     char* target_path = NULL;
 
     target_path = strdup(f->path);
@@ -183,14 +138,14 @@ static SyncStatusCode put_ancestors(Hash* hash, SyncFile* f, SyncAncestorFn fn, 
     int is_ancestor = 0;
 
     while (!hash_get(hash, target_path)) {
-        target = sync_file_new(target_path, is_ancestor || f->is_folder);
+        target = file_new(target_path, is_ancestor || f->is_folder);
 
         if (!target) goto done;
 
         if (fn && (fn(target, is_ancestor, data) != SYNC_STATUS_OK)) goto done;
 
         HashPutResult r = hash_put(hash, target->path, target);
-        sync_file_hash_entry_free(r.old_entry);
+        file_hash_entry_free(r.old_entry);
         if (r.status != HASH_STATUS_OK) goto done;
 
         target = NULL;
@@ -206,16 +161,16 @@ static SyncStatusCode put_ancestors(Hash* hash, SyncFile* f, SyncAncestorFn fn, 
     code = SYNC_STATUS_OK;
 
 done:
-    sync_file_free(target);
+    file_free(target);
     free(target_path);
     return code;
 }
 
-static inline SyncStatusCode ancestor_cb(SyncFile* target, int is_ancestor, void* data) {
+static inline SyncStatusCode ancestor_cb(File* target, int is_ancestor, void* data) {
     SyncPlan* plan = NULL;
 
     SyncAncestorData* d = data;
-    SyncFile* source = is_ancestor ? NULL : d->source;
+    File* source = is_ancestor ? NULL : d->source;
     SyncAction action = target->is_folder ? SYNC_ACTION_MKDIR : SYNC_ACTION_XFER;
 
     plan = sync_plan_new(source, target, action);
@@ -237,14 +192,14 @@ Hash* hash_of_files(List* files) {
     if (!hash) goto error;
 
     for (size_t i = 0; i < list_size(files); i++) {
-        SyncFile* f = list_get(files, i);
+        File* f = list_get(files, i);
         if (put_ancestors(hash, f, NULL, NULL) != SYNC_STATUS_OK) goto error;
     }
 
     return hash;
 
 error:
-    hash_free_deep(hash, sync_file_hash_entry_free);
+    hash_free_deep(hash, file_hash_entry_free);
     return NULL;
 }
 
@@ -254,14 +209,14 @@ List* sync_plan_rm(List* rm_files) {
     List* plans = NULL;
     List* plans_sorted = NULL;
 
-    rm_files_unique = hash_unique(rm_files, sync_file_hc, sync_file_cmp);
+    rm_files_unique = hash_unique(rm_files, file_hc, file_cmp);
     if (!rm_files_unique) goto error;
 
     plans = list_new(list_size(rm_files_unique));
     if (!plans) goto error;
 
     for (size_t i = 0; i < list_size(rm_files_unique); i++) {
-        SyncFile* f = list_get(rm_files_unique, i);
+        File* f = list_get(rm_files_unique, i);
         plan = sync_plan_new(NULL, f, SYNC_ACTION_RM);
         if (!plan) goto error;
 
@@ -292,7 +247,7 @@ List* sync_plan_push(List* source_files, List* target_files, List* specs, int cl
     List* target_files_after = NULL;
     List* plans = NULL;
     List* plans_sorted = NULL;
-    SyncFile* file_tmp = NULL;
+    File* file_tmp = NULL;
     SyncPlan* plan_tmp = NULL;
 
     plans = list_new(list_size(target_files) + list_size(source_files));
@@ -309,11 +264,11 @@ List* sync_plan_push(List* source_files, List* target_files, List* specs, int cl
 
     for (size_t i = 0; i < list_size(specs); i++) {
         SyncSpec* spec = list_get(specs, i);
-        SyncFile* f = hash_get(source_hash, spec->source);
+        File* f = hash_get(source_hash, spec->source);
 
         if (!f) goto error;
 
-        file_tmp = sync_file_new(spec->target, f->is_folder);
+        file_tmp = file_new(spec->target, f->is_folder);
         if (!file_tmp) goto error;
 
         SyncAncestorData data = {
@@ -324,7 +279,7 @@ List* sync_plan_push(List* source_files, List* target_files, List* specs, int cl
         if (put_ancestors(expected_hash, file_tmp, NULL, NULL) != SYNC_STATUS_OK) goto error;
         if (put_ancestors(target_hash, file_tmp, ancestor_cb, &data) != SYNC_STATUS_OK) goto error;
 
-        sync_file_free(file_tmp);
+        file_free(file_tmp);
         file_tmp = NULL;
     }
 
@@ -333,7 +288,7 @@ List* sync_plan_push(List* source_files, List* target_files, List* specs, int cl
         if (!target_files_after) goto error;
 
         for (size_t i = 0; i < list_size(target_files_after); i++) {
-            SyncFile* f = list_get(target_files_after, i);
+            File* f = list_get(target_files_after, i);
             if (strcmp(f->path, "/") != 0 && !hash_get(expected_hash, f->path)) {
                 plan_tmp = sync_plan_new(NULL, f, SYNC_ACTION_RM);
                 if (!plan_tmp) goto error;
@@ -354,11 +309,11 @@ error:
     plans = NULL; // don't double-free
 
 done:
-    hash_free_deep(target_hash, sync_file_hash_entry_free);
-    hash_free_deep(source_hash, sync_file_hash_entry_free);
-    hash_free_deep(expected_hash, sync_file_hash_entry_free);
+    hash_free_deep(target_hash, file_hash_entry_free);
+    hash_free_deep(source_hash, file_hash_entry_free);
+    hash_free_deep(expected_hash, file_hash_entry_free);
     list_free(target_files_after);
-    sync_file_free(file_tmp);
+    file_free(file_tmp);
     sync_plan_free(plan_tmp);
     list_free(plans);
     return plans_sorted;
@@ -391,7 +346,7 @@ List* sync_spec_create(List* files, char* from_path, char* to_path) {
 
     size_t from_path_len = strlen(from_path);
     for (size_t i = 0; i < list_size(files); i++) {
-        SyncFile* f = list_get(files, i);
+        File* f = list_get(files, i);
         if (f->is_folder) continue;
 
         target = fs_path_join(to_path, f->path + from_path_len);

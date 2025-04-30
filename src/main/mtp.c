@@ -237,7 +237,7 @@ done:
 
 MtpStatusCode mtp_mkdir(Device* dev, SyncPlan* plan) {
     MtpStatusCode code = MTP_STATUS_EFAIL;
-    DeviceFile* file = NULL;
+    DeviceFile* dfile = NULL;
     char* new_path = NULL;
     char* path_dname = NULL;
     char* path_bname = NULL;
@@ -248,8 +248,7 @@ MtpStatusCode mtp_mkdir(Device* dev, SyncPlan* plan) {
         goto done;
     }
 
-    Hash* file_hash = dev->files;
-    DeviceFile* existing_file = hash_get(file_hash, path);
+    File* existing_file = device_get_file(dev, path);
     if (existing_file) {
         if (!existing_file->is_folder) {
             code = MTP_STATUS_EEXIST;
@@ -270,20 +269,21 @@ MtpStatusCode mtp_mkdir(Device* dev, SyncPlan* plan) {
 
     uint32_t parent_id = 0;
     if (strcmp("/", path_dname) != 0) {
-        DeviceFile* parent_dir = hash_get(file_hash, path_dname);
-        if (!parent_dir || !parent_dir->is_folder) goto done;
-        parent_id = parent_dir->id;
+        File* parent_dir = device_get_file(dev, path_dname);
+        if (!parent_dir || !parent_dir->is_folder || !parent_dir->data) goto done;
+        DeviceFile* parent_df = parent_dir->data;
+        parent_id = parent_df->id;
     }
 
-    file = malloc(sizeof(DeviceFile));
-    if (!file) goto done;
-    file->is_folder = 1;
-    file->path = new_path;
-    file->size = 0;
-    file->id = LIBMTP_Create_Folder(dev->device, path_bname, parent_id, dev->storage->id);
+    dfile = malloc(sizeof(DeviceFile));
+    if (!dfile) goto done;
+    dfile->is_folder = 1;
+    dfile->path = new_path;
+    dfile->size = 0;
+    dfile->id = LIBMTP_Create_Folder(dev->device, path_bname, parent_id, dev->storage->id);
 
     printf("%s: %s/: ", MTP_MKDIR_MSG, path);
-    if (file->id == 0) {
+    if (dfile->id == 0) {
         printf("Failed!\n");
         code = MTP_STATUS_EDEVICE;
         LIBMTP_Dump_Errorstack(dev->device);
@@ -292,14 +292,14 @@ MtpStatusCode mtp_mkdir(Device* dev, SyncPlan* plan) {
     }
     printf("OK\n");
 
-    if (device_add_file(dev, file) != DEVICE_STATUS_OK) goto done;
+    if (device_add_file(dev, dfile) != DEVICE_STATUS_OK) goto done;
 
     code = MTP_STATUS_OK;
-    file = NULL;
+    dfile = NULL;
     new_path = NULL;
 
 done:
-    free(file);
+    free(dfile);
     free(new_path);
     free(path_bname);
     free(path_dname);
@@ -308,12 +308,14 @@ done:
 
 MtpStatusCode mtp_get_file(Device* dev, SyncPlan* plan) {
     MtpStatusCode code = MTP_STATUS_EFAIL;
-    Hash* file_hash = dev->files;
-    DeviceFile* f = hash_get(file_hash, plan->source->path);
+    File* f = device_get_file(dev, plan->source->path);
     char* target = plan->target->path;
 
+    if (!f || !f->data || f->is_folder) goto done;
+
+    DeviceFile* df = f->data;
     MtpOperationData op = { .name = MTP_PULL_MSG, .file = target };
-    if (LIBMTP_Get_File_To_File(dev->device, f->id, target, mtp_progress, &op) != 0) {
+    if (LIBMTP_Get_File_To_File(dev->device, df->id, target, mtp_progress, &op) != 0) {
         fprintf(stdout, "\n");
         fprintf(stderr, "Error getting file from MTP device.\n");
         LIBMTP_Dump_Errorstack(dev->device);
@@ -330,17 +332,15 @@ done:
 
 MtpStatusCode mtp_send_file(Device* dev, SyncPlan* plan) {
     MtpStatusCode code = MTP_STATUS_EFAIL;
-    DeviceFile* file = NULL;
+    DeviceFile* dfile = NULL;
     LIBMTP_file_t* mtp_file = NULL;
     char* new_path = NULL;
     char* dname = NULL;
     char* bname = NULL;
     char* lcname = NULL;
 
-    Hash* file_hash = dev->files;
-    DeviceFile* existing_file = hash_get(file_hash, plan->target->path);
-    if (existing_file) {
-        fprintf(stderr, "File already exists: %s (%u), skipping\n", plan->target->path, existing_file->id);
+    if (device_get_file(dev, plan->target->path)) {
+        fprintf(stderr, "File already exists: %s, skipping\n", plan->target->path);
         code = MTP_STATUS_EEXIST;
         goto done;
     }
@@ -367,9 +367,10 @@ MtpStatusCode mtp_send_file(Device* dev, SyncPlan* plan) {
 
     uint32_t parent_id = 0;
     if (strcmp("/", dname) != 0) {
-        DeviceFile* parent_dir = hash_get(file_hash, dname);
-        if (!parent_dir || !parent_dir->is_folder) goto done;
-        parent_id = parent_dir->id;
+        File* parent_dir = device_get_file(dev, dname);
+        if (!parent_dir || !parent_dir->is_folder || !parent_dir->data) goto done;
+        DeviceFile* parent_df = parent_dir->data;
+        parent_id = parent_df->id;
     }
 
     mtp_file = LIBMTP_new_file_t();
@@ -381,12 +382,12 @@ MtpStatusCode mtp_send_file(Device* dev, SyncPlan* plan) {
     mtp_file->storage_id = dev->storage->id;
     bname = NULL;
 
-    file = malloc(sizeof(DeviceFile));
-    if (!file) goto done;
-    file->is_folder = 0;
-    file->size = s.st_size;
-    file->path = new_path;
-    file->id = 0;
+    dfile = malloc(sizeof(DeviceFile));
+    if (!dfile) goto done;
+    dfile->is_folder = 0;
+    dfile->size = s.st_size;
+    dfile->path = new_path;
+    dfile->id = 0;
 
     for (size_t i = 0; i < ARRAY_LEN(file_types); i++) {
         MtpPushFileType t = file_types[i];
@@ -406,17 +407,17 @@ MtpStatusCode mtp_send_file(Device* dev, SyncPlan* plan) {
     }
     printf("\n");
 
-    file->id = mtp_file->item_id;
+    dfile->id = mtp_file->item_id;
 
-    if (device_add_file(dev, file) != DEVICE_STATUS_OK) goto done;
+    if (device_add_file(dev, dfile) != DEVICE_STATUS_OK) goto done;
     dev->capacity -= s.st_size;
 
     code = MTP_STATUS_OK;
-    file = NULL;
+    dfile = NULL;
     new_path = NULL;
 
 done:
-    free(file);
+    free(dfile);
     free(new_path);
     free(dname);
     free(bname);
@@ -432,10 +433,11 @@ MtpStatusCode mtp_rm_file(Device* dev, SyncPlan* plan) {
     entry = hash_remove(dev->files, plan->target->path);
     if (!entry) goto done;
 
-    DeviceFile* f = hash_entry_value(entry);
+    File* f = hash_entry_value(entry);
+    DeviceFile* df = f->data;
 
     printf("%s: %s%s: ", MTP_RM_MSG, f->path, f->is_folder ? "/" : "");
-    if (LIBMTP_Delete_Object(dev->device, f->id) != 0) {
+    if (LIBMTP_Delete_Object(dev->device, df->id) != 0) {
         printf("Failed!\n");
         code = MTP_STATUS_EDEVICE;
         LIBMTP_Dump_Errorstack(dev->device);

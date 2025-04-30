@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <libgen.h>
 
+#include "../main/file.h"
 #include "../main/sync.h"
 #include "../main/list.h"
 #include "../main/array.h"
@@ -100,20 +101,20 @@ static int sync_push_test() {
 
         sprintf(target, "/tgt%s", source+4);
 
-        assert(list_push(source_files, sync_file_new(source_file_paths[i], 0)) == LIST_STATUS_OK);
+        assert(list_push(source_files, file_new(source_file_paths[i], 0)) == LIST_STATUS_OK);
         assert(list_push(specs, sync_spec_new(source, target)) == LIST_STATUS_OK);
         free(target);
     }
 
     for (size_t i = 0; i < ARRAY_LEN(target_file_paths); i++) {
-        assert(list_push(target_files, sync_file_new(target_file_paths[i], 0)) == LIST_STATUS_OK);
+        assert(list_push(target_files, file_new(target_file_paths[i], 0)) == LIST_STATUS_OK);
     }
 
     assert_push_cleanup(source_files, target_files, specs);
     assert_push_nocleanup(source_files, target_files, specs);
 
-    list_free_deep(source_files, (ListItemFreeFn)sync_file_free);
-    list_free_deep(target_files, (ListItemFreeFn)sync_file_free);
+    list_free_deep(source_files, (ListItemFreeFn)file_free);
+    list_free_deep(target_files, (ListItemFreeFn)file_free);
     list_free_deep(specs, (ListItemFreeFn)sync_spec_free);
 
     return 0;
@@ -148,10 +149,10 @@ static int sync_rm_test() {
     assert(rm_files);
 
     for (size_t i = 0; i < ARRAY_LEN(rm_dir_paths); i++) {
-        assert(list_push(rm_files, sync_file_new(rm_dir_paths[i], 1)) == LIST_STATUS_OK);
+        assert(list_push(rm_files, file_new(rm_dir_paths[i], 1)) == LIST_STATUS_OK);
     }
     for (size_t i = 0; i < ARRAY_LEN(rm_file_paths); i++) {
-        assert(list_push(rm_files, sync_file_new(rm_file_paths[i], 0)) == LIST_STATUS_OK);
+        assert(list_push(rm_files, file_new(rm_file_paths[i], 0)) == LIST_STATUS_OK);
     }
 
     List* plans = sync_plan_rm(rm_files);
@@ -164,7 +165,7 @@ static int sync_rm_test() {
         assert(strcmp(expected[i], plan->target->path) == 0);
     }
     list_free_deep(plans, (ListItemFreeFn)sync_plan_free);
-    list_free_deep(rm_files, (ListItemFreeFn)sync_file_free);
+    list_free_deep(rm_files, (ListItemFreeFn)file_free);
 
     return 0;
 }

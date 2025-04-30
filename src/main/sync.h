@@ -9,6 +9,7 @@
 #ifndef _SYNC_H_
 #define _SYNC_H_
 
+#include "file.h"
 #include "list.h"
 
 /**
@@ -20,14 +21,6 @@ typedef enum {
     SYNC_ACTION_MKDIR, ///< Create a new directory
     SYNC_ACTION_XFER,  ///< Transfer the file from source to target
 } SyncAction;
-
-/**
- * A file or folder. May be on the local filesystem or the remote device.
- */
-typedef struct {
-    char* path;    ///< Canonical path of the file
-    int is_folder; ///< Truthy if this is a folder
-} SyncFile;
 
 /**
  * A request to synchronize a file from a source to a target.
@@ -42,24 +35,10 @@ typedef struct {
  * files between two systems.
  */
 typedef struct {
-    SyncFile* source;  ///< The source file (may be NULL for some actions)
-    SyncFile* target;  ///< The target file
+    File* source;  ///< The source file (may be NULL for some actions)
+    File* target;  ///< The target file
     SyncAction action; ///< The action to perform
 } SyncPlan;
-
-/**
- * Free a SyncFile.
- * @param f  file to free
- */
-void sync_file_free(SyncFile* f);
-
-/**
- * Create a new SyncFile. Returns NULL in case of failure. Free it when done.
- * @param path       canonical path of the file, will be copied
- * @param is_folder  truthy if this is a folder
- * @return           a new SyncFile, or NULL in case of an error
- */
-SyncFile* sync_file_new(char* path, int is_folder);
 
 /**
  * Free a SyncPlan.
@@ -74,7 +53,7 @@ void sync_plan_free(SyncPlan* plan);
  * @param action  action to take
  * @return        a new SyncPlan, or NULL in case of an error
  */
-SyncPlan* sync_plan_new(SyncFile* source, SyncFile* target, SyncAction action);
+SyncPlan* sync_plan_new(File* source, File* target, SyncAction action);
 
 /**
  * Free a SyncSpec.

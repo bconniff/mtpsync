@@ -10,20 +10,14 @@
 #include "str.h"
 #include "fs.h"
 #include "io.h"
-#include "map.h"
 
 #define MTP_RM_INIT_SIZE 512
 
 MtpStatusCode mtp_rm_files(Device* dev, List* rm_files) {
     MtpStatusCode code = MTP_STATUS_EFAIL;
-    List* sync_files = NULL;
     List* plans = NULL;
 
-    MapStatusCode map_status = MTP_STATUS_OK;
-    sync_files = list_map_data(rm_files, (ListMapDataFn)map_device_file_to_sync_file, &map_status);
-    if (!sync_files || (map_status != MAP_STATUS_OK)) goto done;
-
-    plans = sync_plan_rm(sync_files);
+    plans = sync_plan_rm(rm_files);
     if (!plans) goto done;
 
     if (!list_size(plans)) {
@@ -44,7 +38,6 @@ MtpStatusCode mtp_rm_files(Device* dev, List* rm_files) {
     code = MTP_STATUS_OK;
 
 done:
-    list_free_deep(sync_files, (ListItemFreeFn)sync_file_free);
     list_free_deep(plans, (ListItemFreeFn)sync_plan_free);
     return code;
 }

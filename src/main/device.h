@@ -8,6 +8,7 @@
 
 #include <libmtp.h>
 
+#include "file.h"
 #include "hash.h"
 
 /**
@@ -65,6 +66,14 @@ DeviceStatusCode device_load(Device* d);
  * @return      list of all matching file, or NULL in case of failure
  */
 List* device_filter_files(Device* d, char* path);
+
+/**
+ * Gets a file from the device. Call device_load first.
+ * @param d  device to get the file from
+ * @param f  path to get
+ * @return   matching file or NULL if not found
+ */
+File* device_get_file(Device* d, char* f);
 
 /**
  * Adds a new file to the device's files hash. Call device_load first. Note

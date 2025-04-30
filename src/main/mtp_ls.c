@@ -24,7 +24,7 @@ static MtpStatusCode mtp_ls_callback(Device* dev, void* ls_path) {
     if (!ls_files) goto done;
 
     for (size_t i = 0; i < list_size(ls_files); i++) {
-        DeviceFile* file = list_get(ls_files, i);
+        File* file = list_get(ls_files, i);
         printf("%s%s\n", file->path, file->is_folder ? "/" : "");
     }
 

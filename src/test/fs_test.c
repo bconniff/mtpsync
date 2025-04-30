@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <libgen.h>
 
+#include "../main/file.h"
 #include "../main/str.h"
 #include "../main/fs.h"
 #include "../main/list.h"
@@ -52,13 +53,14 @@ int fs_test(int sz) {
     assert(expect_file);
 
     for (size_t i = 0; i < list_size(files); i++) {
-        if (strcmp(expect_file, list_get(files, i)) == 0) {
+        File* f = list_get(files, i);
+        if (strcmp(expect_file, f->path) == 0 && !f->is_folder) {
             found = 1;
             break;
         }
     }
 
-    list_free_deep(files, free);
+    list_free_deep(files, (ListItemFreeFn)file_free);
 
     assert(found);
 
@@ -66,8 +68,11 @@ int fs_test(int sz) {
     files = fs_collect_files("./src/test/fs_test.c");
     assert(files);
     assert(list_size(files) == 1);
-    assert(strcmp(expect_file, (char*)list_get(files, 0)) == 0);
-    list_free_deep(files, free);
+
+    File* f = list_get(files, 0);
+    assert(strcmp(expect_file, f->path) == 0);
+    assert(!f->is_folder);
+    list_free_deep(files, (ListItemFreeFn)file_free);
     free(expect_file);
 
     // TEST COLLECT ANCESTORS
@@ -77,17 +82,21 @@ int fs_test(int sz) {
     files = fs_collect_ancestors(cwd);
     assert(files);
     assert(list_size(files) >= 1);
-    assert(strcmp("/", (char*)list_get(files, 0)) == 0);
+
+    f = list_get(files, 0);
+    assert(strcmp("/", f->path) == 0);
+    assert(f->is_folder);
 
     found = 0;
     for (size_t i = 0; i < list_size(files); i++) {
-        if (strcmp(cwd, list_get(files, i)) == 0) {
+        File* f = list_get(files, i);
+        if (strcmp(cwd, f->path) == 0 && f->is_folder) {
             found = 1;
             break;
         }
     }
     assert(found);
-    list_free_deep(files, free);
+    list_free_deep(files, (ListItemFreeFn)file_free);
 
     // TEST RESOLVE
     assert_resolve("/", "/");

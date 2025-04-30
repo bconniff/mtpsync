@@ -6,12 +6,12 @@
 #include <sys/stat.h>
 
 #include "device.h"
+#include "file.h"
 #include "list.h"
 #include "mtp.h"
 #include "str.h"
 #include "fs.h"
 #include "io.h"
-#include "map.h"
 
 typedef struct {
     int cleanup;
@@ -22,8 +22,7 @@ typedef struct {
 static List* collect_local_files(char* path) {
     List* child_files = NULL;
     List* parent_dirs = NULL;
-    List* local_files = NULL;
-    SyncFile* file = NULL;
+    List* all_files = NULL;
 
     child_files = fs_collect_files(path);
     if (!child_files && errno == ENOENT) child_files = list_new(0);
@@ -32,39 +31,28 @@ static List* collect_local_files(char* path) {
     parent_dirs = fs_collect_ancestors(path);
     if (!parent_dirs) goto error;
 
-    local_files = list_new(list_size(child_files) + list_size(parent_dirs));
-    if (!local_files) goto error;
+    all_files = list_new(list_size(child_files) + list_size(parent_dirs));
+    if (!all_files) goto error;
 
-    for (size_t i = 0; i < list_size(parent_dirs); i++) {
-        file = sync_file_new(list_get(parent_dirs, i), 1);
-        if (!file) goto error;
-        if (list_push(local_files, file) != LIST_STATUS_OK) goto error;
-        file = NULL;
-    }
-
-    for (size_t i = 0; i < list_size(child_files); i++) {
-        file = sync_file_new(list_get(child_files, i), 0);
-        if (!file) goto error;
-        if (list_push(local_files, file) != LIST_STATUS_OK) goto error;
-        file = NULL;
-    }
+    if (list_push_all(all_files, parent_dirs) != LIST_STATUS_OK) goto error;
+    if (list_push_all(all_files, child_files) != LIST_STATUS_OK) goto error;
 
     goto done;
 
-error:
-    list_free_deep(local_files, (ListItemFreeFn)sync_file_free);
-    local_files = NULL;
-
 done:
-    free(file);
-    list_free_deep(child_files, free);
-    list_free_deep(parent_dirs, free);
-    return local_files;
+    list_free(child_files);
+    list_free(parent_dirs);
+    return all_files;
+
+error:
+    list_free_deep(all_files, (ListItemFreeFn)child_files);
+    list_free_deep(all_files, (ListItemFreeFn)parent_dirs);
+    list_free(all_files);
+    return NULL;
 }
 
 static MtpStatusCode mtp_pull_callback(Device* dev, void* data) {
     MtpStatusCode code = MTP_STATUS_EFAIL;
-    List* device_files = NULL;
     List* local_files = NULL;
     List* pull_specs = NULL;
     List* source_files = NULL;
@@ -78,12 +66,8 @@ static MtpStatusCode mtp_pull_callback(Device* dev, void* data) {
         goto done;
     }
 
-    device_files = device_filter_files(dev, params->from_path);
-    if (!device_files) goto done;
-
-    MapStatusCode map_status = MAP_STATUS_OK;
-    source_files = list_map_data(device_files, (ListMapDataFn)map_device_file_to_sync_file, &map_status);
-    if (!source_files || (map_status != MAP_STATUS_OK)) goto done;
+    source_files = device_filter_files(dev, params->from_path);
+    if (!source_files) goto done;
 
     local_files = collect_local_files(params->to_path);
     if (!local_files) goto done;
@@ -109,9 +93,8 @@ static MtpStatusCode mtp_pull_callback(Device* dev, void* data) {
     code = MTP_STATUS_OK;
 
 done:
-    list_free(device_files);
-    list_free_deep(local_files, free);
-    list_free_deep(source_files, (ListItemFreeFn)sync_file_free);
+    list_free(source_files);
+    list_free_deep(local_files, (ListItemFreeFn)file_free);
     list_free_deep(plans, (ListItemFreeFn)sync_plan_free);
     list_free_deep(pull_specs, (ListItemFreeFn)sync_spec_free);
     return code;

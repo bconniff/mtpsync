@@ -13,9 +13,9 @@
 
 #define DEVICE_HASH_INIT_SIZE 512
 
-static inline int device_file_sort_alpha(const void* a, const void* b) {
-    const DeviceFile* aa = *(const DeviceFile**)a;
-    const DeviceFile* bb = *(const DeviceFile**)b;
+static inline int file_sort_alpha(const void* a, const void* b) {
+    const File* aa = *(const File**)a;
+    const File* bb = *(const File**)b;
     int result = strcmp(aa->path, bb->path);
     return result;
 }
@@ -29,7 +29,11 @@ void device_file_free(DeviceFile* f) {
 
 void device_hash_entry_free(HashEntry* e) {
     if (e) {
-        device_file_free(hash_entry_value(e));
+        File* f = hash_entry_value(e);
+        if (f) {
+            device_file_free(f->data);
+            file_free(f);
+        }
         hash_entry_free(e);
     }
 }
@@ -109,11 +113,27 @@ done:
     return code;
 }
 
-DeviceStatusCode device_add_file(Device* d, DeviceFile* f) {
-    HashPutResult r = hash_put(d->files, f->path, f);
+File* device_get_file(Device* d, char* path) {
+    return hash_get(d->files, path);
+}
+
+DeviceStatusCode device_add_file(Device* d, DeviceFile* dfile) {
+    DeviceStatusCode code = DEVICE_STATUS_EFAIL;
+    File* file = NULL;
+
+    file = file_new_data(dfile->path, dfile->is_folder, dfile);
+    if (!file) goto done;
+
+    HashPutResult r = hash_put(d->files, file->path, file);
     device_hash_entry_free(r.old_entry);
-    if (r.status != HASH_STATUS_OK) return DEVICE_STATUS_EFAIL;
-    return DEVICE_STATUS_OK;
+    if (r.status != HASH_STATUS_OK) goto done;
+
+    code = DEVICE_STATUS_OK;
+    file = NULL;
+
+done:
+    file_free(file);
+    return code;
 }
 
 Device* device_new(int number, LIBMTP_mtpdevice_t* device, LIBMTP_devicestorage_t* storage) {
@@ -174,7 +194,7 @@ void device_free(Device* d) {
 }
 
 static int is_within_path(void* item, void* data) {
-    DeviceFile* f = item;
+    File* f = item;
     char* path = data;
     size_t i = 0;
 
@@ -189,7 +209,7 @@ static int is_within_path(void* item, void* data) {
     return file_path[i] == '/' || !file_path[i];
 }
 
-List* device_filter_files_sorted(Device* dev, char* path, ListCmpFn fn) {
+List* device_filter_files(Device* dev, char* path) {
     List* files = NULL;
     List* filtered = NULL;
     List* sorted = NULL;
@@ -200,14 +220,10 @@ List* device_filter_files_sorted(Device* dev, char* path, ListCmpFn fn) {
     filtered = list_filter_data(files, is_within_path, path);
     if (!filtered) goto done;
 
-    sorted = list_sort(filtered, fn);
+    sorted = list_sort(filtered, file_sort_alpha);
 
 done:
     list_free(files);
     list_free(filtered);
     return sorted;
-}
-
-List* device_filter_files(Device* dev, char* path) {
-    return device_filter_files_sorted(dev, path, device_file_sort_alpha);
 }
