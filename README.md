@@ -1,4 +1,4 @@
-# mtpsync
+# mtpsync {#mainpage}
 
 Command-line tool to synchronize files with MTP devices, based on libmtp.
 Designed to work with Garmin watches, not tested with other devices.

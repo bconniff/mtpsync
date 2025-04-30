@@ -2,6 +2,7 @@
  * @file color.h
  * ANSI color code macros.
  */
+
 #ifndef _COLOR_H_
 #define _COLOR_H_
 
