@@ -44,7 +44,7 @@ static void usage(char* name) {
     fprintf(stderr, "OPTIONS:\n\n");
     fprintf(stderr, "    -d [device_id]   Operate on a specific device ID\n");
     fprintf(stderr, "    -s [storage_id]  Operate on a specific storage volume\n");
-    fprintf(stderr, "    -x               Remove stray files from target after push\n");
+    fprintf(stderr, "    -x               Remove stray files after push/pull\n\n");
     fprintf(stderr, "COMMANDS:\n\n");
     fprintf(stderr, "    devices  Show available devices\n");
     fprintf(stderr, "    ls       List files and folders on the device\n");

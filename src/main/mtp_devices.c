@@ -3,6 +3,7 @@
 #include <string.h>
 #include <libgen.h>
 
+#include "color.h"
 #include "device.h"
 #include "mtp.h"
 
@@ -21,17 +22,17 @@ static MtpStatusCode mtp_devices_callback(Device* d, void* data) {
         if (!name) goto done;
 
         printf("\n");
-        printf("\33[1mDevice:\33[0m %s\n", name);
-        printf(" * \33[1mNumber\33[0m: %i\n", d->number);
-        printf(" * \33[1mSerial\33[0m: SN:%s\n", d->serial);
+        printf(C_BOLD "Device:" C_RESET " %s\n", name);
+        printf(" * " C_BOLD "Number:" C_RESET " %i\n", d->number);
+        printf(" * " C_BOLD "Serial:" C_RESET " SN:%s\n", d->serial);
     }
 
     int free_percent = (d->storage->FreeSpaceInBytes*100)/(d->storage->MaxCapacity);
 
     // print storage info
-    printf(" * \33[1mStorage\33[0m: %s\n", d->storage->StorageDescription);
-    printf("   - \33[1mID\33[0m: %08x\n", d->storage->id);
-    printf("   - \33[1mFree Space\33[0m: %d%% (%llu bytes)\n", free_percent, (long long unsigned int)d->storage->FreeSpaceInBytes);
+    printf(" * " C_BOLD "Storage:" C_RESET " %s\n", d->storage->StorageDescription);
+    printf("   - " C_BOLD "ID:" C_RESET " %08x\n", d->storage->id);
+    printf("   - " C_BOLD "Free Space:" C_RESET " %d%% (%llu bytes)\n", free_percent, (long long unsigned int)d->storage->FreeSpaceInBytes);
 
     code = MTP_STATUS_OK;
 
