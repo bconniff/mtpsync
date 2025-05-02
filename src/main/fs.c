@@ -1,4 +1,6 @@
+#ifdef __linux__
 #define _XOPEN_SOURCE 500
+#endif
 
 #include <dirent.h>
 #include <errno.h>
@@ -10,7 +12,6 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <threads.h>
 #include <unistd.h>
 #include <ftw.h>
 
@@ -32,7 +33,7 @@ enum FsPathState {
 };
 
 // used to collect file listing with nftw and nftw_callback
-static thread_local List* g_files = NULL;
+static _Thread_local List* g_files = NULL;
 
 static inline int nftw_callback(const char* fpath, const struct stat* s, int tflag, struct FTW* ftwbuf) {
     int e = ENOMEM;

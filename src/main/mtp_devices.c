@@ -31,7 +31,7 @@ static MtpStatusCode mtp_devices_callback(Device* d, void* data) {
     // print storage info
     printf(" * \33[1mStorage\33[0m: %s\n", d->storage->StorageDescription);
     printf("   - \33[1mID\33[0m: %08x\n", d->storage->id);
-    printf("   - \33[1mFree Space\33[0m: %d%% (%lu bytes)\n", free_percent, d->storage->FreeSpaceInBytes);
+    printf("   - \33[1mFree Space\33[0m: %d%% (%llu bytes)\n", free_percent, d->storage->FreeSpaceInBytes);
 
     code = MTP_STATUS_OK;
 
