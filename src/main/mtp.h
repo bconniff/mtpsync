@@ -41,12 +41,14 @@ typedef struct {
 } MtpOperationData;
 
 /**
- * Device filtering parameters to use with mtp_each_device.
+ * Program command-line arguments.
  */
 typedef struct {
-    char* device_id;   ///< Device index, serial number, or NULL for all
-    char* storage_id;  ///< Storage ID, or NULL for all
-} MtpDeviceParams;
+    char* device_id;  ///< Device index, serial number, or NULL for all
+    char* storage_id; ///< Storage ID, or NULL for all
+    int yes;          ///< If truthy, skip interaction and assume "yes"
+    int cleanup;      ///< If truthy, remove stray files after push/pull
+} MtpArgs;
 
 /**
  * Callback function for mtp_each_device.
@@ -62,11 +64,11 @@ typedef MtpStatusCode (*MtpDeviceFn)(Device* dev, void* data);
  * the device when done. An open device and storage handle will be passed to
  * the callback along with the additional data parameter.
  * @param callback  to invoke for each device & storage combination
- * @param params    used to select specific devies or storage by ID
+ * @param args      used to select specific devies or storage by ID
  * @param data      additional context data provided to the callback function
  * @return          status code indicating success or failure
  */
-MtpStatusCode mtp_each_device(MtpDeviceFn callback, MtpDeviceParams* params, void* data);
+MtpStatusCode mtp_each_device(MtpDeviceFn callback, MtpArgs* args, void* data);
 
 /**
  * Send a local file to an MTP device.

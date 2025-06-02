@@ -8,9 +8,9 @@
 
 /**
  * Implements the "devices" sub-command.
- * @param params  command-line parameters
- * @return        status code of the operation
+ * @param args  command-line parameters
+ * @return      status code of the operation
  */
-MtpStatusCode mtp_devices(MtpDeviceParams* params);
+MtpStatusCode mtp_devices(MtpArgs* args);
 
 #endif

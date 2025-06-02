@@ -17,12 +17,6 @@
 #include "main/sync.h"
 #include "main/array.h"
 
-typedef struct {
-    char* device_id;
-    char* storage_id;
-    int cleanup;
-} MtpArgs;
-
 typedef MtpStatusCode (*CommandFn)(int, char**, MtpArgs*);
 
 typedef struct {
@@ -30,21 +24,14 @@ typedef struct {
     CommandFn cmd_fn;
 } Command;
 
-static inline MtpDeviceParams as_params(MtpArgs* args) {
-    MtpDeviceParams params = {
-        .device_id = args->device_id,
-        .storage_id = args->storage_id,
-    };
-    return params;
-}
-
 static void usage(char* name) {
     fprintf(stderr, "USAGE: %s <push|pull|rm> [options..] <path/to/file..>\n\n", name);
     fprintf(stderr, "    Sync files between filesystem and an MTP device\n\n");
     fprintf(stderr, "OPTIONS:\n\n");
     fprintf(stderr, "    -d [device_id]   Operate on a specific device ID\n");
     fprintf(stderr, "    -s [storage_id]  Operate on a specific storage volume\n");
-    fprintf(stderr, "    -x               Remove stray files after push/pull\n\n");
+    fprintf(stderr, "    -x               Remove stray files after push/pull\n");
+    fprintf(stderr, "    -y               Assume yes, do not prompt for interaction\n\n");
     fprintf(stderr, "COMMANDS:\n\n");
     fprintf(stderr, "    devices  Show available devices\n");
     fprintf(stderr, "    ls       List files and folders on the device\n");
@@ -62,8 +49,7 @@ static MtpStatusCode pull_impl(int argc, char **argv, MtpArgs* args) {
     char* from_path = argv[2];
     char* to_path = argc < 4 ? NULL : argv[3];
 
-    MtpDeviceParams params = as_params(args);
-    return mtp_pull(&params, from_path, to_path, args->cleanup);
+    return mtp_pull(args, from_path, to_path);
 }
 
 static MtpStatusCode push_impl(int argc, char** argv, MtpArgs* args) {
@@ -75,8 +61,7 @@ static MtpStatusCode push_impl(int argc, char** argv, MtpArgs* args) {
     char* from_path = argv[2];
     char* to_path = argv[3];
 
-    MtpDeviceParams params = as_params(args);
-    return mtp_push(&params, from_path, to_path, args->cleanup);
+    return mtp_push(args, from_path, to_path);
 }
 
 static MtpStatusCode rm_impl(int argc, char** argv, MtpArgs* args) {
@@ -96,8 +81,7 @@ static MtpStatusCode rm_impl(int argc, char** argv, MtpArgs* args) {
         if (list_push(rm_paths, argv[i]) != LIST_STATUS_OK) goto done;
     }
 
-    MtpDeviceParams params = as_params(args);
-    code = mtp_rm(&params, rm_paths);
+    code = mtp_rm(args, rm_paths);
 
 done:
     list_free(rm_paths);
@@ -110,13 +94,11 @@ static MtpStatusCode ls_impl(int argc, char** argv, MtpArgs* args) {
         return MTP_STATUS_ESYNTAX;
     }
 
-    MtpDeviceParams params = as_params(args);
-    return mtp_ls(&params, argv[2]);
+    return mtp_ls(args, argv[2]);
 }
 
 static MtpStatusCode devices_impl(int argc, char** argv, MtpArgs* args) {
-    MtpDeviceParams params = as_params(args);
-    return mtp_devices(&params);
+    return mtp_devices(args);
 }
 
 static ArgStatusCode device_arg(int argc, char** argv, int* i, void* data) {
@@ -146,6 +128,12 @@ static ArgStatusCode storage_arg(int argc, char** argv, int* i, void* data) {
 static ArgStatusCode cleanup_arg(int argc, char** argv, int* i, void* data) {
     MtpArgs* args = data;
     args->cleanup = 1;
+    return ARG_STATUS_OK;
+}
+
+static ArgStatusCode yes_arg(int argc, char** argv, int* i, void* data) {
+    MtpArgs* args = data;
+    args->yes = 1;
     return ARG_STATUS_OK;
 }
 
@@ -186,6 +174,7 @@ int main(int argc, char** argv) {
         { .arg_long = "cleanup", .arg_short = 'x', .arg_fn = cleanup_arg },
         { .arg_long = "device", .arg_short = 'd', .arg_fn = device_arg },
         { .arg_long = "storage", .arg_short = 's', .arg_fn = storage_arg },
+        { .arg_long = "yes", .arg_short = 'y', .arg_fn = yes_arg },
     };
 
     size_t defc = ARRAY_LEN(defv);

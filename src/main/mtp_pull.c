@@ -14,7 +14,7 @@
 #include "io.h"
 
 typedef struct {
-    int cleanup;
+    MtpArgs* args;
     char* from_path;
     char* to_path;
 } MtpPullParams;
@@ -75,16 +75,21 @@ static MtpStatusCode mtp_pull_callback(Device* dev, void* data) {
     pull_specs = sync_spec_create(source_files, params->from_path, params->to_path);
     if (!pull_specs) goto done;
 
-    plans = sync_plan_push(source_files, local_files, pull_specs, params->cleanup);
+    plans = sync_plan_push(source_files, local_files, pull_specs, params->args->cleanup);
     if (!plans) goto done;
 
-    sync_plan_print(plans, MTP_PULL_MSG);
-
     if (list_size(plans)) {
-        if (!io_confirm("Proceed [y/n]? ")) {
+        int yes = params->args->yes;
+        if (!yes) {
+            sync_plan_print(plans, MTP_PULL_MSG);
+            yes = io_confirm("Proceed [y/n]? ");
+        }
+
+        if (!yes) {
             code = MTP_STATUS_EREJECT;
             goto done;
         }
+
         if (mtp_execute_pull_plan(dev, plans) != MTP_STATUS_OK) goto done;
     } else {
         printf("All files already present on the local system.\n");
@@ -100,7 +105,7 @@ done:
     return code;
 }
 
-MtpStatusCode mtp_pull(MtpDeviceParams* mtp_params, char* from_path, char* to_path, int cleanup) {
+MtpStatusCode mtp_pull(MtpArgs* args, char* from_path, char* to_path) {
     MtpStatusCode code = MTP_STATUS_EFAIL;
     char* from_path_bname = NULL;
     char* to_path_tmp = NULL;
@@ -130,11 +135,11 @@ MtpStatusCode mtp_pull(MtpDeviceParams* mtp_params, char* from_path, char* to_pa
     }
 
     MtpPullParams pull_params = {
+        .args = args,
         .from_path = from_path_r,
         .to_path = to_path_r,
-        .cleanup = cleanup,
     };
-    code = mtp_each_device(mtp_pull_callback, mtp_params, &pull_params);
+    code = mtp_each_device(mtp_pull_callback, args, &pull_params);
 
 done:
     free(from_path_r);

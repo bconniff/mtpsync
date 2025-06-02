@@ -13,7 +13,12 @@
 
 #define MTP_RM_INIT_SIZE 512
 
-MtpStatusCode mtp_rm_files(Device* dev, List* rm_files) {
+typedef struct {
+    MtpArgs* args;
+    List* rm_paths;
+} MtpRmParams;
+
+static MtpStatusCode mtp_rm_files(Device* dev, MtpArgs* args, List* rm_files) {
     MtpStatusCode code = MTP_STATUS_EFAIL;
     List* plans = NULL;
 
@@ -26,9 +31,13 @@ MtpStatusCode mtp_rm_files(Device* dev, List* rm_files) {
         goto done;
     }
 
-    sync_plan_print(plans, MTP_PUSH_MSG);
+    int yes = args->yes;
+    if (!yes) {
+        sync_plan_print(plans, MTP_PUSH_MSG);
+        yes = io_confirm("Proceed [y/n]? ");
+    }
 
-    if (!io_confirm("Proceed [y/n]? ")) {
+    if (!yes) {
         code = MTP_STATUS_EREJECT;
         goto done;
     }
@@ -42,7 +51,7 @@ done:
     return code;
 }
 
-MtpStatusCode mtp_rm_paths(Device* dev, List* rm_paths) {
+static MtpStatusCode mtp_rm_paths(Device* dev, MtpArgs* args, List* rm_paths) {
     MtpStatusCode code = MTP_STATUS_EFAIL;
     List* tmp_files = NULL;
     List* rm_files = NULL;
@@ -69,7 +78,7 @@ MtpStatusCode mtp_rm_paths(Device* dev, List* rm_paths) {
         tmp_files = NULL;
     }
 
-    code = mtp_rm_files(dev, rm_files);
+    code = mtp_rm_files(dev, args, rm_files);
 
 done:
     list_free(tmp_files);
@@ -78,10 +87,11 @@ done:
 }
 
 static inline MtpStatusCode mtp_rm_callback(Device* dev, void* data) {
-    return mtp_rm_paths(dev, (List*)data);
+    MtpRmParams* params = data;
+    return mtp_rm_paths(dev, params->args, params->rm_paths);
 }
 
-MtpStatusCode mtp_rm(MtpDeviceParams* mtp_params, List* rm_paths) {
+MtpStatusCode mtp_rm(MtpArgs* args, List* rm_paths) {
     MtpStatusCode code = MTP_STATUS_EFAIL;
     char* rm_path_r = NULL;
     List* rm_paths_r = NULL;
@@ -97,7 +107,11 @@ MtpStatusCode mtp_rm(MtpDeviceParams* mtp_params, List* rm_paths) {
         rm_path_r = NULL;
     }
 
-    code = mtp_each_device(mtp_rm_callback, mtp_params, rm_paths_r);
+    MtpRmParams rm_params = {
+        .args = args,
+        .rm_paths = rm_paths,
+    };
+    code = mtp_each_device(mtp_rm_callback, args, &rm_params);
 
 done:
     free(rm_path_r);

@@ -35,14 +35,14 @@ done:
     return code;
 }
 
-MtpStatusCode mtp_ls(MtpDeviceParams* mtp_params, char* ls_path) {
+MtpStatusCode mtp_ls(MtpArgs* args, char* ls_path) {
     MtpStatusCode code = MTP_STATUS_EFAIL;
     char* ls_path_r = NULL;
 
     ls_path_r = fs_resolve_cwd("/", ls_path);
     if (!ls_path_r) goto done;
 
-    code = mtp_each_device(mtp_ls_callback, mtp_params, ls_path_r);
+    code = mtp_each_device(mtp_ls_callback, args, ls_path_r);
 
 done:
     free(ls_path_r);

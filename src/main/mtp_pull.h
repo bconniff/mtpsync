@@ -8,12 +8,11 @@
 
 /**
  * Implements the "pull" sub-command.
- * @param params     command-line parameters
+ * @param args       command-line arguments
  * @param from_path  path on the device to retrieve files from
  * @param to_path    local path to retrieve files into
- * @param cleanup    if truthy, delete stray files from the to_path
  * @return           status code of the operation
  */
-MtpStatusCode mtp_pull(MtpDeviceParams* params, char* from_path, char* to_path, int cleanup);
+MtpStatusCode mtp_pull(MtpArgs* args, char* from_path, char* to_path);
 
 #endif

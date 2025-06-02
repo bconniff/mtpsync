@@ -158,7 +158,7 @@ static inline int mtp_progress(const uint64_t sent, const uint64_t total, void c
     return 0;
 }
 
-static inline int match_device(Device* dev, MtpDeviceParams* params) {
+static inline int match_device(Device* dev, MtpArgs* params) {
     int device_match = 1;
     int storage_match = 1;
 
@@ -185,7 +185,7 @@ static inline int match_device(Device* dev, MtpDeviceParams* params) {
     return device_match && storage_match;
 }
 
-MtpStatusCode mtp_each_device(MtpDeviceFn callback, MtpDeviceParams* params, void* data) {
+MtpStatusCode mtp_each_device(MtpDeviceFn callback, MtpArgs* params, void* data) {
     MtpStatusCode code = MTP_STATUS_EFAIL;
     LIBMTP_mtpdevice_t* device = NULL;
     Device* d = NULL;

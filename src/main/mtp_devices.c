@@ -41,7 +41,7 @@ done:
     return code;
 }
 
-MtpStatusCode mtp_devices(MtpDeviceParams* mtp_params) {
+MtpStatusCode mtp_devices(MtpArgs* args) {
     int current_device_number = -1;
-    return mtp_each_device(mtp_devices_callback, mtp_params, &current_device_number);
+    return mtp_each_device(mtp_devices_callback, args, &current_device_number);
 }
