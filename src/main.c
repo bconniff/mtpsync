@@ -17,6 +17,8 @@
 #include "main/sync.h"
 #include "main/array.h"
 
+#define CASE_IF(code, msg) case (code): fprintf(stderr, msg "\n"); break;
+
 typedef MtpStatusCode (*CommandFn)(int, char**, MtpArgs*);
 
 typedef struct {
@@ -189,20 +191,15 @@ int main(int argc, char** argv) {
         case MTP_STATUS_OK:
             return EXIT_SUCCESS;
 
-        case MTP_STATUS_ENOCMD:
-            fprintf(stderr, "Please specify a valid command.\n");
-            break;
-
-        case MTP_STATUS_ESYNTAX:
-            fprintf(stderr, "Invalid syntax.\n");
-            break;
-
-        case MTP_STATUS_EREJECT:
-            fprintf(stderr, "Action declined by user, exiting.\n");
-            break;
+        CASE_IF(MTP_STATUS_ENOCMD, "Please specify a valid command")
+        CASE_IF(MTP_STATUS_ESYNTAX, "Invalid syntax")
+        CASE_IF(MTP_STATUS_EREJECT, "Action declined by user, exiting")
+        CASE_IF(MTP_STATUS_EDEVICE, "Could not connect to device")
+        CASE_IF(MTP_STATUS_ENODEV, "No device found")
+        CASE_IF(MTP_STATUS_ENOMEM, "Failed to allocate memory")
 
         default:
-            fprintf(stderr, "An unexpected error occurred (code %i).\n", code);
+            fprintf(stderr, "An unexpected error occurred (code %i)\n", code);
             break;
     }
 

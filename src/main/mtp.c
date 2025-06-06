@@ -93,7 +93,6 @@ static MtpRawDevices mtp_detect_raw_devices() {
 
     switch (err) {
         case LIBMTP_ERROR_NO_DEVICE_ATTACHED:
-            fprintf(stdout, "No device found\n");
             result.status = MTP_STATUS_OK;
             break;
 
@@ -102,17 +101,14 @@ static MtpRawDevices mtp_detect_raw_devices() {
             break;
 
         case LIBMTP_ERROR_CONNECTING:
-            fprintf(stderr, "Could not connect to device\n");
             result.status = MTP_STATUS_EDEVICE;
             break;
 
         case LIBMTP_ERROR_MEMORY_ALLOCATION:
-            fprintf(stderr, "Failed to allocate memory\n");
             result.status = MTP_STATUS_ENOMEM;
             break;
 
         default:
-            fprintf(stderr, "An unknown error occurred\n");
             result.status = MTP_STATUS_EFAIL;
             break;
     }
@@ -199,6 +195,7 @@ MtpStatusCode mtp_each_device(MtpDeviceFn callback, MtpArgs* params, void* data)
         goto done;
     }
 
+    int matched_devices = 0;
     for (int i = 0; i < raw_devices.count; i++) {
         device = mtp_open_raw_device(&raw_devices.devices[i], i);
         if (!device) {
@@ -211,6 +208,7 @@ MtpStatusCode mtp_each_device(MtpDeviceFn callback, MtpArgs* params, void* data)
             if (!d) goto done;
 
             if (match_device(d, params)) {
+                matched_devices++;
                 MtpStatusCode callback_status = callback(d, data);
                 if (callback_status != MTP_STATUS_OK) {
                     code = callback_status;
@@ -226,7 +224,7 @@ MtpStatusCode mtp_each_device(MtpDeviceFn callback, MtpArgs* params, void* data)
         device = NULL;
     }
 
-    code = MTP_STATUS_OK;
+    code = matched_devices ? MTP_STATUS_OK : MTP_STATUS_ENODEV;
 
 done:
     mtp_release_device(device);

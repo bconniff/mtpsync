@@ -30,6 +30,7 @@ typedef enum {
     MTP_STATUS_EEXIST,   ///< File already exists
     MTP_STATUS_EREJECT,  ///< User rejected the operation interactively
     MTP_STATUS_ESYNTAX,  ///< Invoked with invalid syntax
+    MTP_STATUS_ENODEV,   ///< No applicable device attached
 } MtpStatusCode;
 
 /**
